@@ -8,84 +8,33 @@ import openpyxl
 import re
 import yaml
 import scipy.stats
-
 import argparse
-
-model_names = {
-    'line': 'Line (updated)',
-    'linemidweek': 'Line (Midweek)',
-    'lineopen': 'Line (opening)',
-    'linehow': 'Howell',
-    'linemarsee': 'Marsee',
-    'linedokter': 'Doktor Entropy',
-    'linekeep': 'Keeper',
-    'lineatom': 'Atomic Football',
-    'lineargh': 'ARGH Power Ratings',
-    'linecong': 'Dave Congrove',
-    'linebillings': 'Billingsley',
-    'linebillings2': 'Billingsley+',
-    'linecather': 'Catherwood Ratings',
-    'lineburdorf': 'Lee Burdorf',
-    'linepiratings': 'Pi-Rate Ratings',
-    'linepimean': 'Pi-Ratings Mean',
-    'linepibias': 'Pi-Rate Bias',
-    'linerwp': 'Laffaye RWP',
-    'linemassey': 'Massey Ratings',
-    'lineclean': 'Cleanup Hitter',
-    'linebmc': 'Brent Craig',
-    'linepugh': 'ComPughter Ratings',
-    'linedwig': 'DP Dwiggins',
-    'linefpi': 'ESPN FPI',
-    'linecrunch': 'The Sports Cruncher',
-    'linebressler': 'Liam Bressler',
-    'linetalis': 'Talisman Red',
-    'linesag': 'Sagarin Points',
-    'linesagr': 'Sagarin Recent',
-    'linesagpred': 'Sagarin Ratings',
-    'linesaggm': 'Sagarin Golden Mean',
-    'linepfz': 'PerformanZ Ratings',
-    'linemoore': 'Moore Power Ratings',
-    'linenutshell': 'NutShell Sports',
-    'lineelo': 'Beck Elo',
-    'lineborn': 'Born Power Index',
-    'linefox': 'Stat Fox',
-    'linelaz': 'Laz Index',
-    'linepig': 'Pigskin Index',
-    'linekam': 'Edward Kambour',
-    'linepayne': 'Payne Power Ratings',
-    'lineash': 'Ashby AccuRatings',
-    'linesuper': 'Super List',
-    'linekerns': 'Stephen Kerns',
-    'lineteamrank': 'TeamRankings.com',
-    'linecons': 'Massey Consensus',
-    'linedonchess': 'Donchess Inference',
-    'lineloud': 'Loudsound.org',
-    'linecurry': 'Daniel Curry Index',
-    'linedunk': 'Dunkel Index',
-    'lineavg': 'System Average',
-    'linemedian': 'System Median',
-    'lineca': 'Computer Adjusted Line'
-}
+import logging
 
 
-def main(pred, res, slate, names, model, output):
+def main(pred, res, slate, names, model, output, debug):
+
+    logging.getLogger().setLevel(debug)
 
     pred_df = download_predictions(pred)
+    logging.debug(pred_df)
 
-    results_df = download_results(res)
+    with open(names) as names_file:
+        names_dict = yaml.load(names_file)
+    models_df = download_models(res, names_dict)
+    logging.debug(models_df)
 
-    games, teams, gotw, noisy_spreads = parse_slate(slate)
+    slate_df = parse_slate(slate)
+    logging.debug(slate_df)
 
-    names_dict, reverse_dict = parse_names(names)
+    slate_df, pred_df = fix_names(slate_df, pred_df, names_dict)
+    logging.debug(pred_df)
+    logging.debug(slate_df)
 
-    home_match, away_match = match_predictions(pred_df, teams, reverse_dict)
+    slate_df = predict(slate_df, pred_df, models_df, model, names_dict)
+    logging.debug(slate_df)
 
-    spreads = parse_spreads(noisy_spreads, home_match, away_match)
-
-    lines = parse_predictions(pred_df, home_match, away_match, model)
-
-    make_predictions(results_df, names_dict, home_match, away_match,
-                     spreads, gotw, lines, model, slate, output)
+    write_picks(slate_df, slate, output)
 
 
 
@@ -97,11 +46,16 @@ def download_predictions(pred):
 
 
 ## Read the current model perfomance from the Internet.
-def download_results(res):
+def download_models(res, names):
+    reverse_dict = {val: key for key, val in names['models'].items()}
     with urlopen(res) as results_file:
         bs = bs4.BeautifulSoup(results_file, "lxml")
         results_df = pd.read_html(str(bs), attrs={'class': 'results_table'}, header=0)
-        return results_df[0]
+        results_df = results_df[0]
+        results_df['System'] = results_df['System'].map(reverse_dict)
+        results_df['std_dev'] = np.sqrt(results_df['Mean Square Error'] - results_df['Bias'].pow(2))
+        results_df = results_df[pd.notnull(results_df['System'])]
+        return results_df.set_index('System')
 
 
 ## Read in the current slate.
@@ -112,136 +66,105 @@ def parse_slate(slate):
     game_regex = re.compile(r'(?:\*\*)?(?:#\d+\s+)?(.*?)\s+(?:vs\.?|@)\s+(?:#\d+\s+)?(.*?)(?:\*\*)?$', re.IGNORECASE)
     games = [c.value for c in game_cells if c.value and game_regex.match(c.value)]
 
-    teams = []
+    home = []
+    away = []
     for g in games:
         matches = game_regex.match(g)
         if matches:
-            teams.append((matches.group(1), matches.group(2)))
+            away.append(matches.group(1))
+            home.append(matches.group(2))
 
     gotw = [bool(re.search(r'\*\*', g)) for g in games]
 
     spread_cells = ws['B']
     spread_text = [c.value for c in spread_cells if c.value and re.match(r'^Enter\s+(?!one)', c.value)]
     spread_regex = re.compile(r'^Enter\s+(.*?)\s+iff.*?(\d+)\s+points', re.IGNORECASE)
+    spread_favorites = []
     noisy_spreads = []
     for s in spread_text:
         matches = spread_regex.match(s)
         if matches:
-            noisy_spreads.append((matches.group(1), int(matches.group(2))))
+            spread_favorites.append(matches.group(1))
+            noisy_spreads.append(int(matches.group(2)))
         else:
-            noisy_spreads.append((None, None))
+            spread_favorites.append(None)
+            noisy_spreads.append(0)
 
-    return games, teams, gotw, noisy_spreads
+    slate_df = pd.DataFrame(data = {"road": away,
+                                    "home": home,
+                                    "gotw": gotw,
+                                    "noisy_favorite": spread_favorites,
+                                    "noisy_spread": noisy_spreads})
 
+    slate_df.loc[slate_df['noisy_favorite'] == slate_df['road'], 'noisy_spread'] *= -1
 
-## Read in a translation table between slate names and prediction names.
-def parse_names(names):
-    with open(names) as names_file:
-        names_dict = yaml.load(names_file)
-
-    names_dict = {key.upper(): val for key, val in names_dict.items()}
-    reverse_dict = {val: key for key, val in names_dict.items()}
-    return names_dict, reverse_dict
-
-# Make picks.
-
-## Get proper names
-def match_predictions(pred_df, teams, reverse_dict):
-    pred_df['home'] = pred_df['home'].str.upper().str.replace(r'\.', '')
-    pred_df['road'] = pred_df['road'].str.upper().str.replace(r'\.', '')
-
-    home_match = []
-    away_match = []
-
-    def find_match(slate_team, home_road):
-        if slate_team not in reverse_dict:
-            if slate_team in pred_df[home_road]:
-                print("'{}' ({} team from slate) not found in names dict, but found in predictions".format(slate_team, home_road))
-                return slate_team
-            else:
-                raise KeyError("'{}' ({} team from slate) not found in names dict!".format(slate_team, home_road))
-        else:
-            return reverse_dict[slate_team]
-
-    for team_pair in teams:
-        away_match.append(find_match(team_pair[0], 'road'))
-        home_match.append(find_match(team_pair[1], 'home'))
-
-    return home_match, away_match
+    return slate_df
 
 
-## Parse spreads
-def parse_spreads(noisy_spreads, home_match, away_match):
-    spreads = []
-    for s in noisy_spreads:
-        if s[0]:
-            points = s[1]
-            if s[0] in away_match:
-                points *= -1
-            spreads.append(points)
-        else:
-            spreads.append(0)
-    return spreads
+## Get proper team names
+def fix_names(slate_df, pred_df, names_dict):
 
+    reverse_dict = {val: key.upper() for key, val in names_dict['teams'].items()}
 
-## Parse the lines from the predictions
-def parse_predictions(pred_df, home_match, away_match, model):
-    assert model in model_names
+    for ha in ['home', 'road']:
+        slate_df['proper_' + ha] = slate_df[ha].map(reverse_dict)
+        non_match = pd.isnull(slate_df['proper_' + ha])
+        if non_match.any():
+            logging.warn("{} slate teams missing from names map: {}".format(ha, slate_df.loc[non_match, ha]))
+        slate_df.loc[non_match, 'proper_' + ha] = slate_df.loc[non_match, ha]
 
-    lines = []
+        pred_df[ha] = pred_df[ha].str.upper().str.replace(r'\.', '')
+        pred_match = slate_df['proper_' + ha].isin(pred_df[ha])
+        if (~pred_match).any():
+            logging.warn("{} slate teams missing from predictions: {}".format(ha, slate_df.loc[~pred_match, ha]))
 
-    for home, away in zip(home_match, away_match):
-        home_index = pred_df['home'] == home
-        if not home_index.any():
-            print("'{}' (home team from slate) not found in predictions!".format(home))
-        away_index = pred_df['road'] == away
-        if not away_index.any():
-            print("'{}' (road team from slate) not found in predictions!".format(away))
-        n_found = (away_index | home_index).sum()
-        if n_found == 0:
-            print("'{}' @ '{}' not found in predictions!".format(away, home))
-            lines.append(np.nan)
-        elif n_found > 1:
-            raise KeyError("'{}' and '{}' are not playing each other this week!".format(away, home))
-        else:
-            index = (away_index | home_index)
-            lines.append(pred_df.loc[index, model].tolist()[0])
-
-    return lines
+    return slate_df, pred_df
 
 
 ## Make picks
-def make_predictions(results_df, names_dict, home_match, away_match, spreads, gotw, lines, model, slate, output):
+def predict(slate_df, pred_df, models_df, model, names_dict):
 
-    assert model in model_names
+    straight_model = model
+    noisy_model = model
+    logging.info("using model {}".format(model))
+    if model == 'best':
+        straight_model = models_df.sort_values('Pct. Correct', ascending=False).index[0]
+        noisy_model = models_df.sort_values('std_dev', ascending=True).index[0]
+        logging.info("best straight pick model: {}".format(straight_model))
+        logging.info("best noisy spread model: {}".format(noisy_model))
 
-    line_results = results_df.loc[results_df['System'] == model_names[model]]
-    bias = line_results['Bias'].tolist()[0]
-    mse = line_results['Mean Square Error'].tolist()[0]
-    std_dev = np.sqrt(mse - bias*bias)
+    slate_df = pd.merge(slate_df, pred_df, how='left',
+                        left_on=['proper_home', 'proper_road'], right_on=['home', 'road'])
 
-    picks = []
-    spread_probs = []
-    pred_points = []
+    noisy = slate_df['noisy_spread'] != 0
 
-    for home, away, gw, spread, line in zip(home_match, away_match, gotw, spreads, lines):
-        if np.isnan(line):
-            spread_probs.append(np.nan)
-            picks.append(np.nan)
-            pred_points.append(np.nan)
-            continue
+    slate_df['line'] = slate_df[straight_model]
+    slate_df.loc[noisy, 'line'] = slate_df.loc[noisy, noisy_model]
 
-        prob = 1 - scipy.stats.norm.cdf(spread, loc=line - bias, scale=std_dev)
-        if prob > .5:
-            picks.append(names_dict[home])
-        else:
-            picks.append(names_dict[away])
-            prob = 1 - prob
-        spread_probs.append(prob)
-        if gw:
-            prob *= 2
-        pred_points.append(prob)
+    slate_df['bias'] = models_df.loc[straight_model, 'Bias']
+    slate_df.loc[noisy, 'bias'] = models_df.loc[noisy_model, 'Bias']
 
+    slate_df['std_dev'] = models_df.loc[straight_model, 'std_dev']
+    slate_df.loc[noisy, 'std_dev'] = models_df.loc[noisy_model, 'std_dev']
+
+    slate_df['debiased_line'] = slate_df['line'] - slate_df['bias']
+
+    slate_df['prob'] = 1 - scipy.stats.norm.cdf(slate_df['noisy_spread'], loc=slate_df['debiased_line'],
+                                                scale=slate_df['std_dev'])
+    slate_df['pick'] = slate_df['proper_home']
+    slate_df.loc[pd.isnull(slate_df['prob']), 'pick'] = None # no line available
+    road_picks = slate_df['prob'] < .5
+    slate_df.loc[road_picks, 'pick'] = slate_df.loc[road_picks, 'proper_road']
+    slate_df.loc[road_picks, 'prob'] = 1 - slate_df.loc[road_picks, 'prob']
+
+    names_lookup = {key.upper(): val for key, val in names_dict['teams'].items()}
+    slate_df['pick'] = slate_df['pick'].map(names_lookup)
+
+    return slate_df
+
+
+## Write picks
+def write_picks(slate_df, slate, output):
     wb = openpyxl.load_workbook(slate)
     ws = wb.active
 
@@ -249,10 +172,11 @@ def make_predictions(results_df, names_dict, home_match, away_match, spreads, go
     ws.cell(row=1, column=5, value="Predicted Margin").font = openpyxl.styles.Font(bold=True)
     ws.cell(row=1, column=6, value="Notes").font = openpyxl.styles.Font(bold=True)
 
-    for i, (pick, prob, line) in enumerate(zip(picks, spread_probs, lines)):
-        ws.cell(row=i+2, column=3, value=pick)
-        ws.cell(row=i+2, column=4, value=prob)
-        ws.cell(row=i+2, column=5, value=line - bias)
+    for i, row in enumerate(slate_df[['pick', 'prob', 'debiased_line']].itertuples(index=False)):
+        logging.info("Pick: {}".format(row))
+        ws.cell(row=i+2, column=3, value=row[0])
+        ws.cell(row=i+2, column=4, value=row[1])
+        ws.cell(row=i+2, column=5, value=row[2])
 
     wb.save(output)
 
@@ -278,6 +202,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--model', '-m', help="Model name to use (typically begins with 'line')",
                         default='line')
+
+    parser.add_argument('--debug', '-d', help="Debug level",
+                        default='WARNING', choices=logging._levelToName.values())
 
     args = parser.parse_args()
 
