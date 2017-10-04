@@ -78,15 +78,15 @@ def main(pred, res, slate, names, model, output):
 
     names_dict, reverse_dict = parse_names(names)
 
-    home_match, away_match = match_predictions(teams, reverse_dict)
+    home_match, away_match = match_predictions(pred_df, teams, reverse_dict)
 
     spreads = parse_spreads(noisy_spreads, home_match, away_match)
 
     lines = parse_predictions(pred_df, home_match, away_match, model)
 
-    picks, spread_probs, points = make_predictions(results_df, home_match, away_match, spreads, gotw, lines, model)
+    make_predictions(results_df, names_dict, home_match, away_match,
+                     spreads, gotw, lines, model, slate, output)
 
-    write_picks(slate, output, picks, spread_probs, points)
 
 
 ## Read in the current line and computer rankings from the Internet.
@@ -146,9 +146,9 @@ def parse_names(names):
 # Make picks.
 
 ## Get proper names
-def match_predictions(teams, reverse_dict):
-    pred_df['home'] = pred_df['home'].str.upper().str.replace(r'\.': '', '')
-    pred_df['road'] = pred_df['road'].str.upper().str.replace(r'\.': '', '')
+def match_predictions(pred_df, teams, reverse_dict):
+    pred_df['home'] = pred_df['home'].str.upper().str.replace(r'\.', '')
+    pred_df['road'] = pred_df['road'].str.upper().str.replace(r'\.', '')
 
     home_match = []
     away_match = []
@@ -211,7 +211,7 @@ def parse_predictions(pred_df, home_match, away_match, model):
 
 
 ## Make picks
-def make_predictions(results_df, home_match, away_match, spreads, gotw, lines, model):
+def make_predictions(results_df, names_dict, home_match, away_match, spreads, gotw, lines, model, slate, output):
 
     assert model in model_names
 
@@ -241,12 +241,6 @@ def make_predictions(results_df, home_match, away_match, spreads, gotw, lines, m
         if gw:
             prob *= 2
         pred_points.append(prob)
-
-    return picks, spread_probs, pred_points
-
-
-## Write picks.
-def write_picks(slate, output, picks, spread_probs, points):
 
     wb = openpyxl.load_workbook(slate)
     ws = wb.active
