@@ -4,28 +4,66 @@ import pandas as pd
 import numpy as np
 from urllib.request import urlopen
 import bs4
-import openpyxl
 import re
 import yaml
 import scipy.stats
 import argparse
 import logging
+import os
 
+from googleapiclient import discovery
+from oauth2client import client, tools
+from oauth2client.file import Storage
 
-def main(pred, res, slate, names, model, output, debug):
+SCOPES = 'https://www.googleapis.com/auth/spreadsheets'
+CLIENT_SECRET_FILE = 'client_secret.json'
+APPLICATION_NAME = "B1G Pick 'Em Picker"
+
+def get_credentials(flags):
+    """Gets valid user credentials from storage.
+
+    If nothing has been stored, or if the stored credentials are invalid,
+    the OAuth2 flow is completed to obtain the new credentials.
+
+    Returns:
+        Credentials, the obtained credential.
+    """
+    home_dir = os.path.expanduser('~')
+    credential_dir = os.path.join(home_dir, '.credentials')
+    if not os.path.exists(credential_dir):
+        os.makedirs(credential_dir)
+    credential_path = os.path.join(credential_dir,
+                                   'sheets.googleapis.com-python-quickstart.json')
+
+    store = Storage(credential_path)
+    credentials = store.get()
+    if not credentials or credentials.invalid:
+        flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
+        flow.user_agent = APPLICATION_NAME
+        credentials = tools.run_flow(flow, store, flags)
+        print('Storing credentials to ' + credential_path)
+    return credentials
+
+def main(pred, res, slate, names, model, output, debug, **flags):
 
     logging.getLogger().setLevel(debug)
+    flags = argparse.Namespace(**flags)
+    flags.logging_level = debug
+
+    credentials = get_credentials(flags)
+    service = discovery.build('sheets', 'v4', credentials=credentials)
+
+    with open(names) as names_file:
+        names_dict = yaml.load(names_file)
+
+    slate_df = download_slate(service, slate)
+    logging.debug(slate_df)
 
     pred_df = download_predictions(pred)
     logging.debug(pred_df)
 
-    with open(names) as names_file:
-        names_dict = yaml.load(names_file)
     models_df = download_models(res, names_dict)
     logging.debug(models_df)
-
-    slate_df = parse_slate(slate)
-    logging.debug(slate_df)
 
     slate_df, pred_df = fix_names(slate_df, pred_df, names_dict)
     logging.debug(pred_df)
@@ -34,7 +72,7 @@ def main(pred, res, slate, names, model, output, debug):
     slate_df = predict(slate_df, pred_df, models_df, model, names_dict)
     logging.debug(slate_df)
 
-    write_picks(slate_df, slate, output)
+    write_picks(service, slate, output, slate_df)
 
 
 
@@ -59,12 +97,17 @@ def download_models(res, names):
 
 
 ## Read in the current slate.
-def parse_slate(slate):
-    wb = openpyxl.load_workbook(slate)
-    ws = wb.active
-    game_cells = ws['A']
+def download_slate(service, slate):
+
+    range_names = ['A:A', 'B:B']
+    result = service.spreadsheets().values().batchGet(
+        spreadsheetId=slate, ranges=range_names, majorDimension="COLUMNS").execute()
+
+    game_columns = result.get('valueRanges')[0]
+    game_cells = game_columns.get('values')[0]
+
     game_regex = re.compile(r'(?:\*\*)?(?:#\d+\s+)?(.*?)\s+(?:vs\.?|@)\s+(?:#\d+\s+)?(.*?)(?:\*\*)?$', re.IGNORECASE)
-    games = [c.value for c in game_cells if c.value and game_regex.match(c.value)]
+    games = [c for c in game_cells if c and game_regex.match(c)]
 
     home = []
     away = []
@@ -76,8 +119,10 @@ def parse_slate(slate):
 
     gotw = [bool(re.search(r'\*\*', g)) for g in games]
 
-    spread_cells = ws['B']
-    spread_text = [c.value for c in spread_cells if c.value and re.match(r'^Enter\s+(?!one)', c.value)]
+    spread_columns = result.get('valueRanges')[1]
+    spread_cells = spread_columns.get('values')[0]
+
+    spread_text = [c for c in spread_cells if c and re.match(r'^Enter\s+(?!one)', c)]
     spread_regex = re.compile(r'^Enter\s+(.*?)\s+iff.*?(\d+)\s+points', re.IGNORECASE)
     spread_favorites = []
     noisy_spreads = []
@@ -138,6 +183,9 @@ def predict(slate_df, pred_df, models_df, model, names_dict):
 
     noisy = slate_df['noisy_spread'] != 0
 
+    slate_df['model'] = straight_model
+    slate_df.loc[noisy, 'model'] = noisy_model
+
     slate_df['line'] = slate_df[straight_model]
     slate_df.loc[noisy, 'line'] = slate_df.loc[noisy, noisy_model]
 
@@ -164,46 +212,118 @@ def predict(slate_df, pred_df, models_df, model, names_dict):
 
 
 ## Write picks
-def write_picks(slate_df, slate, output):
-    wb = openpyxl.load_workbook(slate)
-    ws = wb.active
+def write_picks(service, slate, output, slate_df):
 
-    ws.cell(row=1, column=4, value="Probability of Correct Pick").font = openpyxl.styles.Font(bold=True)
-    ws.cell(row=1, column=5, value="Predicted Margin").font = openpyxl.styles.Font(bold=True)
-    ws.cell(row=1, column=6, value="Notes").font = openpyxl.styles.Font(bold=True)
+    slate_sheet = service.spreadsheets().get(spreadsheetId=slate).execute()
+    slate_title = slate_sheet.get("properties").get("title")
 
-    for i, row in enumerate(slate_df[['pick', 'prob', 'debiased_line']].itertuples(index=False)):
-        logging.info("Pick: {}".format(row))
-        ws.cell(row=i+2, column=3, value=row[0])
-        ws.cell(row=i+2, column=4, value=row[1])
-        ws.cell(row=i+2, column=5, value=row[2])
+    sheet_id = slate_sheet.get("sheets")[0].get("properties").get("sheetId")
+    service.spreadsheets().sheets().copyTo(spreadsheetId=slate, sheetId=sheet_id,
+                                           body={"destinationSpreadsheetId": output}).execute()
+    # re-read the info from the sheet
+    output_sheet = service.spreadsheets().get(spreadsheetId=output).execute()
+    new_sheet_id = output_sheet.get("sheets")[-1].get("properties").get("sheetId")
+    # Rename the sheet
+    rename_sheet_body = {
+        'requests': [
+            {
+                'updateSheetProperties': {
+                    'properties': {
+                        'sheetId': new_sheet_id,
+                        'title': slate_title
+                    },
+                    'fields': 'title'
+                }
+            }
+        ]
+    }
+    new_sheet = service.spreadsheets().batchUpdate(spreadsheetId=output, body=rename_sheet_body).execute()
 
-    wb.save(output)
+    titles = [["Probability of Correct Pick",
+              "Predicted Margin",
+              "Notes"]]
+    title_range = "'{}'!D1:F1".format(slate_title)
 
+    picks = [slate_df['pick'].fillna('').tolist()]
+    picks_range = "'{}'!C2".format(slate_title)
+
+    probs = [slate_df['prob'].fillna('').tolist()]
+    probs_range = "'{}'!D2".format(slate_title)
+
+    lines = [slate_df['debiased_line'].fillna('').tolist()]
+    lines_range = "'{}'!E2".format(slate_title)
+
+    slate_df['notes'] = "(model: " + slate_df['model'] + ")"
+    noisy = (abs(slate_df['debiased_line']) >= 14) & (slate_df['noisy_spread'] == 0)
+    slate_df.loc[noisy, 'notes'] = "Probably should have been a noisy spread.  " + slate_df.loc[noisy, 'notes']
+    far = slate_df['prob'] >= .8
+    slate_df.loc[far, 'notes'] = "Not even close.  " + slate_df.loc[far, 'notes']
+    notes = [slate_df['notes'].tolist()]
+    notes_range = "'{}'!F2".format(slate_title)
+
+    service.spreadsheets().values().batchUpdate(
+        spreadsheetId=output,
+        body={
+            'valueInputOption': "RAW",
+            'data': [
+                {
+                    'range': title_range,
+                    'values': titles,
+                    'majorDimension': "ROWS"
+                },
+                {
+                    'range': picks_range,
+                    'values': picks,
+                    'majorDimension': "COLUMNS"
+                },
+                {
+                    'range': probs_range,
+                    'values': probs,
+                    'majorDimension': "COLUMNS"
+                },
+                {
+                    'range': lines_range,
+                    'values': lines,
+                    'majorDimension': "COLUMNS"
+                },
+                {
+                    'range': notes_range,
+                    'values': notes,
+                    'majorDimension': "COLUMNS"
+                },
+            ]
+        }).execute()
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description="Make your picks for you!")
+    parser = argparse.ArgumentParser(description="Make your picks for you!", parents=[tools.argparser])
 
-    parser.add_argument('--slate', '-s', help="This week's slate",
+    parser.add_argument('--slate', '-s', help="Google Sheets object ID of this week's slate",
+                        metavar="SHEET_ID",
                         required=True)
 
-    parser.add_argument('--output', '-o', help="Output Excel file name",
+    parser.add_argument('--output', '-o', help="Google Sheets object ID of output sheet",
+                        metavar="SHEET_ID",
                         required=True)
 
     parser.add_argument('--pred', '-p', help="URL of NCAA predictions file",
+                        metavar="URL",
                         default="http://www.thepredictiontracker.com/ncaapredictions.csv")
 
     parser.add_argument('--res', '-r', help="URL containing HTML table of model performance and results",
+                        metavar="URL",
                         default="http://www.thepredictiontracker.com/ncaaresults.php")
 
     parser.add_argument('--names', '-n', help="File containing translation from slate names to prediction names",
+                        metavar="YAML",
                         default="names.yaml")
 
     parser.add_argument('--model', '-m', help="Model name to use (typically begins with 'line')",
+                        metavar="MODEL_NAME",
                         default='line')
 
     parser.add_argument('--debug', '-d', help="Debug level",
+                        metavar="LEVEL",
                         default='WARNING', choices=logging._levelToName.values())
 
     args = parser.parse_args()
