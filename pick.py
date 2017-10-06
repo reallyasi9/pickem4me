@@ -221,11 +221,10 @@ def write_picks(service, slate, output, slate_df, format_dict):
     slate_title = slate_sheet.get("properties").get("title")
 
     sheet_id = slate_sheet.get("sheets")[0].get("properties").get("sheetId")
-    service.spreadsheets().sheets().copyTo(spreadsheetId=slate, sheetId=sheet_id,
-                                           body={"destinationSpreadsheetId": output}).execute()
-    # re-read the info from the sheet
-    output_sheet = service.spreadsheets().get(spreadsheetId=output).execute()
-    new_sheet_id = output_sheet.get("sheets")[-1].get("properties").get("sheetId")
+    output_sheet = service.spreadsheets().sheets().copyTo(
+        spreadsheetId=slate, sheetId=sheet_id,
+        body={"destinationSpreadsheetId": output}).execute()
+    new_sheet_id = output_sheet.get("sheetId")
     # Rename the sheet
     rename_sheet_body = {
         'requests': [
@@ -242,60 +241,84 @@ def write_picks(service, slate, output, slate_df, format_dict):
     }
     new_sheet = service.spreadsheets().batchUpdate(spreadsheetId=output, body=rename_sheet_body).execute()
 
-    titles = [["Probability of Correct Pick",
-              "Predicted Margin",
-              "Notes"]]
-    title_range = "'{}'!D1:F1".format(slate_title)
+    update_data = []
+    # titles
+    update_data.append({
+        "range": "'{}'!D1:I1".format(slate_title),
+        "values": [["Probability of Correct Pick",
+                    "Predicted Margin",
+                    "Notes",
+                    "Winner",
+                    "Spread",
+                    "Correct"]],
+        "majorDimension": "ROWS"
+    })
 
-    picks = [slate_df['pick'].fillna('').tolist()]
-    picks_range = "'{}'!C2".format(slate_title)
+    # picks
+    update_data.append({
+        "range": "'{}'!C2".format(slate_title),
+        "values": [slate_df['pick'].fillna('').tolist()],
+        "majorDimension": "COLUMNS"
+    })
 
-    probs = [slate_df['prob'].fillna('').tolist()]
-    probs_range = "'{}'!D2".format(slate_title)
+    # probabilities
+    update_data.append({
+        "range": "'{}'!D2".format(slate_title),
+        "values": [slate_df['prob'].fillna('').tolist()],
+        "majorDimension": "COLUMNS"
+    })
 
-    lines = [slate_df['debiased_line'].fillna('').tolist()]
-    lines_range = "'{}'!E2".format(slate_title)
+    # lines
+    update_data.append({
+        "range": "'{}'!E2".format(slate_title),
+        "values": [slate_df['debiased_line'].fillna('').tolist()],
+        "majorDimension": "COLUMNS"
+    })
 
+    # notes
     slate_df['notes'] = "(model: " + slate_df['model'] + ")"
     noisy = (abs(slate_df['debiased_line']) >= 14) & (slate_df['noisy_spread'] == 0)
     slate_df.loc[noisy, 'notes'] = "Probably should have been a noisy spread.  " + slate_df.loc[noisy, 'notes']
     far = slate_df['prob'] >= .8
     slate_df.loc[far, 'notes'] = "Not even close.  " + slate_df.loc[far, 'notes']
-    notes = [slate_df['notes'].tolist()]
-    notes_range = "'{}'!F2".format(slate_title)
+
+    update_data.append({
+        "range": "'{}'!F2".format(slate_title),
+        "values": [slate_df['notes'].tolist()],
+        "majorDimension": "COLUMNS"
+    })
 
     service.spreadsheets().values().batchUpdate(
         spreadsheetId=output,
         body={
             'valueInputOption': "RAW",
-            'data': [
-                {
-                    'range': title_range,
-                    'values': titles,
-                    'majorDimension': "ROWS"
-                },
-                {
-                    'range': picks_range,
-                    'values': picks,
-                    'majorDimension': "COLUMNS"
-                },
-                {
-                    'range': probs_range,
-                    'values': probs,
-                    'majorDimension': "COLUMNS"
-                },
-                {
-                    'range': lines_range,
-                    'values': lines,
-                    'majorDimension': "COLUMNS"
-                },
-                {
-                    'range': notes_range,
-                    'values': notes,
-                    'majorDimension': "COLUMNS"
-                },
-            ]
+            'data': update_data
         }).execute()
+
+    # For each pick, determine if we should update the style or not
+    requests = []
+    # Note: _x comes from the merge with the probs DF, which also had
+    # 'home' and 'road' columns
+    for i, row in enumerate(slate_df[['home_x', 'road_x', 'pick']].itertuples(index=False)):
+        if row.pick not in format_dict:
+            continue
+        format = {"range": {"sheetId": new_sheet_id,
+                            "startRowIndex": i+1,
+                            "startColumnIndex": 2,
+                            "endRowIndex": i+2,
+                            "endColumnIndex": 3},
+                  "fields": "*"}
+        if row.pick == row.home_x:
+            format['rows'] = [{"values": [format_dict[row.pick]['home']]}]
+        else:
+            format['rows'] = [{"values": [format_dict[row.pick]['road']]}]
+        requests.append({"updateCells": format})
+
+    service.spreadsheets().batchUpdate(
+        spreadsheetId=output,
+        body={"requests": requests,
+              "includeSpreadsheetInResponse": False}
+    ).execute()
 
 if __name__ == '__main__':
 
