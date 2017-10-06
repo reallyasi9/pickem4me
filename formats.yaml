@@ -1,0 +1,157 @@
+# To be used as a "userEnteredFormat"
+# Just supply a "range"
+ILL:
+    home:
+        userEnteredValue:
+            stringValue: ILL
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.878
+                green: 0.306
+                blue: 0.224
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.075
+                    green: 0.161
+                    blue: 0.294
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: ILL
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.075
+                green: 0.161
+                blue: 0.294
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.878
+                    green: 0.306
+                    blue: 0.224
+                    alpha: 1.0
+
+IND:
+    home:
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 1.0
+                blue: 1.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.49
+                    green: 0.067
+                    blue: 0.047
+                    alpha: 1.0
+    road:
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.49
+                green: 0.067
+                blue: 0.047
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 1.0
+                    blue: 1.0
+                    alpha: 1.0
+
+IOWA:
+    home:
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 0.882
+                blue: 0.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.0
+                    green: 0.0
+                    blue: 0.0
+                    alpha: 1.0
+    road:
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.0
+                green: 0.0
+                blue: 0.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 0.882
+                    blue: 0.0
+                    alpha: 1.0
+
+UMD:
+    home:
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 0.835
+                blue: 0.125
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.0
+                    green: 0.0
+                    blue: 0.0
+                    alpha: 1.0
+    road:
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.878
+                green: 0.227
+                blue: 0.243
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 1.0
+                    blue: 1.0
+                    alpha: 1.0
+
+MICH:
+    home:
+        userEnteredValue:
+            stringValue: HARBAUGH!
+        horizontalAlignment: "CENTER"
+        verticalAlignment: "MIDDLE"
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 0796
+                blue: 0.020
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.0
+                    green: 0.153
+                    blue: 0.298
+                    alpha: 1.0
+                bold: True
+                fontSize: 14
+    road:
+        userEnteredValue:
+            stringValue: HARBAUGH!
+        horizontalAlignment: "CENTER"
+        verticalAlignment: "MIDDLE"
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.0
+                green: 0.153
+                blue: 0.298
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 0796
+                    blue: 0.020
+                    alpha: 1.0
+                bold: True
+                fontSize: 14

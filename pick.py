@@ -44,7 +44,7 @@ def get_credentials(flags):
         print('Storing credentials to ' + credential_path)
     return credentials
 
-def main(pred, res, slate, names, model, output, debug, **flags):
+def main(pred, res, slate, names, formats, model, output, debug, **flags):
 
     logging.getLogger().setLevel(debug)
     flags = argparse.Namespace(**flags)
@@ -72,7 +72,10 @@ def main(pred, res, slate, names, model, output, debug, **flags):
     slate_df = predict(slate_df, pred_df, models_df, model, names_dict)
     logging.debug(slate_df)
 
-    write_picks(service, slate, output, slate_df)
+    with open(formats) as format_file:
+        format_dict = yaml.load(format_file)
+
+    write_picks(service, slate, output, slate_df, format_dict)
 
 
 
@@ -212,7 +215,7 @@ def predict(slate_df, pred_df, models_df, model, names_dict):
 
 
 ## Write picks
-def write_picks(service, slate, output, slate_df):
+def write_picks(service, slate, output, slate_df, format_dict):
 
     slate_sheet = service.spreadsheets().get(spreadsheetId=slate).execute()
     slate_title = slate_sheet.get("properties").get("title")
@@ -317,6 +320,10 @@ if __name__ == '__main__':
     parser.add_argument('--names', '-n', help="File containing translation from slate names to prediction names",
                         metavar="YAML",
                         default="names.yaml")
+
+    parser.add_argument('--formats', '-f', help="File containing formats for certain special cells",
+                        metavar="YAML",
+                        default="formats.yaml")
 
     parser.add_argument('--model', '-m', help="Model name to use (typically begins with 'line')",
                         metavar="MODEL_NAME",
