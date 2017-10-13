@@ -1,0 +1,155 @@
+teams:
+    Air Force: AF
+    Akron: AKRON
+    Alabama: BAMA
+    Arkansas: ARK
+    Arkansas State: ARK ST
+    Army: ARMY
+    Auburn: AUBURN
+    Ball State: BALL ST
+    Baylor: BAYLOR
+    Bowling Green: BGSU
+    Buffalo: BUFF
+    BYU: BYU
+    Charleston Southern: CHAR SO
+    Cincinnati: CINCY
+    Clemson: CLEM
+    Colorado: COLO
+    Colorado State: COLO ST
+    Duke: DUKE
+    E Kentucky: E KY
+    ECU: ECU
+    FAU: FAU
+    FIU: FIU
+    Florida: FLA
+    Fresno State: FRESNO ST
+    FSU: FSU
+    Furman: FURMAN
+    Ga Southern: GA SO
+    Georgia: UGA
+    Georgia State: GA ST
+    GSU: GSU
+    Hawaii: HAWAII
+    Houston: HOUSTON
+    Howard: HOWARD
+    Illinois: ILL
+    Illinois State: ILL ST
+    Indiana: IND
+    Indiana State: IN ST
+    Iowa: IOWA
+    Kent State: KENT ST
+    LA Tech: LA TECH
+    Louisville: LOUIS
+    LSU: LSU
+    Maryland: UMD
+    Michigan: MICH
+    Michigan St: MSU
+    Minnesota: MINN
+    Miss St: MISS ST
+    Missouri: MIZZOU
+    Morgan State: MORG ST
+    Murray State: MURRAY ST
+    Navy: NAVY
+    Nebraska: NEB
+    Nevada: NEV
+    New Mexico: NEW MX
+    NC St: NC STATE
+    North Dakota State: ND ST
+    North Texas: N TX
+    Northwestern: NU
+    Notre Dame: ND
+    Ohio: OHIO
+    Oklahoma: OKLA
+    Oklahoma State: OK ST
+    Ole Miss: OLE MISS
+    Oregon: ORE
+    Oregon State: ORE ST
+    Ohio St: OSU
+    Penn St: PSU
+    Pitt: PITT
+    Purdue: PUR
+    Rutgers: RUT
+    San Diego State: SDSU
+    SMU: SMU
+    Stanford: STAN
+    TCU: TCU
+    Temple: TEMPLE
+    Tennessee: TENN
+    Texas A&M: TX A&M
+    Tulsa: TULSA
+    UAB: UAB
+    UCF: UCF
+    UCLA: UCLA
+    UNC: UNC
+    UNLV: UNLV
+    USC: USC
+    USF: USF
+    Utah: UTAH
+    Utah State: UTAH ST
+    UTEP: UTEP
+    UTSA: UTSA
+    UVA: UVA
+    VT: VA TECH
+    W Kentucky: W KY
+    W Michigan: W MICH
+    Wake Forest: WAKE
+    Washington: WASH
+    Washington St: WASH ST
+    West Va: WVU
+    Wisconsin: WISC
+    Wyoming: WYO
+
+models:
+    line: Line (updated)
+    linemidweek: Line (Midweek)
+    lineopen: Line (opening)
+    linehow: Howell
+    linemarsee: Marsee
+    linedokter: Doktor Entropy
+    linekeep: Keeper
+    lineatom: Atomic Football
+    lineargh: ARGH Power Ratings
+    linecong: Dave Congrove
+    linebillings: Billingsley
+    linebillings2: Billingsley+
+    linecather: Catherwood Ratings
+    lineburdorf: Lee Burdorf
+    linepiratings: Pi-Rate Ratings
+    linepimean: Pi-Ratings Mean
+    linepibias: Pi-Rate Bias
+    linerwp: Laffaye RWP
+    linemassey: Massey Ratings
+    lineclean: Cleanup Hitter
+    linebmc: Brent Craig
+    linepugh: ComPughter Ratings
+    linedwig: DP Dwiggins
+    linefpi: ESPN FPI
+    linecrunch: The Sports Cruncher
+    linebressler: Liam Bressler
+    linetalis: Talisman Red
+    linesag: Sagarin Points
+    linesagr: Sagarin Recent
+    linesagpred: Sagarin Ratings
+    linesaggm: Sagarin Golden Mean
+    linepfz: PerformanZ Ratings
+    linemoore: Moore Power Ratings
+    linenutshell: NutShell Sports
+    lineelo: Beck Elo
+    lineborn: Born Power Index
+    linefox: Stat Fox
+    linelaz: Laz Index
+    linepig: Pigskin Index
+    linekam: Edward Kambour
+    linepayne: Payne Power Ratings
+    lineash: Ashby AccuRatings
+    linesuper: Super List
+    linekerns: Stephen Kerns
+    lineteamrank: TeamRankings.com
+    linecons: Massey Consensus
+    linedonchess: Donchess Inference
+    lineloud: Loudsound.org
+    linecurry: Daniel Curry Index
+    linedunk: Dunkel Index
+    lineavg: System Average
+    linemedian: System Median
+    lineca: Computer Adjusted Line

@@ -1,0 +1,457 @@
+# To be used as a "userEnteredFormat"
+# Just supply a "range"
+ILL:
+    home:
+        userEnteredValue:
+            stringValue: ILL
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.878
+                green: 0.306
+                blue: 0.224
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.075
+                    green: 0.161
+                    blue: 0.294
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: ILL
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.075
+                green: 0.161
+                blue: 0.294
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.878
+                    green: 0.306
+                    blue: 0.224
+                    alpha: 1.0
+
+IND:
+    home:
+        userEnteredValue:
+            stringValue: IND
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 1.0
+                blue: 1.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.49
+                    green: 0.067
+                    blue: 0.047
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: IND
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.49
+                green: 0.067
+                blue: 0.047
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 1.0
+                    blue: 1.0
+                    alpha: 1.0
+
+IOWA:
+    home:
+        userEnteredValue:
+            stringValue: IOWA
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 0.882
+                blue: 0.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.0
+                    green: 0.0
+                    blue: 0.0
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: IOWA
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.0
+                green: 0.0
+                blue: 0.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 0.882
+                    blue: 0.0
+                    alpha: 1.0
+
+UMD:
+    home:
+        userEnteredValue:
+            stringValue: UMD
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 0.835
+                blue: 0.125
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.0
+                    green: 0.0
+                    blue: 0.0
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: UMD
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.878
+                green: 0.227
+                blue: 0.243
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 1.0
+                    blue: 1.0
+                    alpha: 1.0
+
+MICH:
+    home:
+        userEnteredValue:
+            stringValue: HARBAUGH!
+        userEnteredFormat:
+            horizontalAlignment: CENTER
+            verticalAlignment: MIDDLE
+            backgroundColor:
+                red: 1.0
+                green: 0.796
+                blue: 0.020
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.0
+                    green: 0.153
+                    blue: 0.298
+                    alpha: 1.0
+                bold: True
+                fontSize: 14
+    road:
+        userEnteredValue:
+            stringValue: HARBAUGH!
+        userEnteredFormat:
+            horizontalAlignment: CENTER
+            verticalAlignment: MIDDLE
+            backgroundColor:
+                red: 0.0
+                green: 0.153
+                blue: 0.298
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 0.796
+                    blue: 0.020
+                    alpha: 1.0
+                bold: True
+                fontSize: 14
+
+MSU:
+    home:
+        userEnteredValue:
+            stringValue: respekt
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 1.0
+                blue: 1.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.094
+                    green: 0.271
+                    blue: 0.231
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: respekt
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.094
+                green: 0.271
+                blue: 0.231
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 1.0
+                    blue: 1.0
+                    alpha: 1.0
+
+MINN:
+    home:
+        userEnteredValue:
+            stringValue: MINN
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 0.8
+                blue: 0.2
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.478
+                    green: 0.0
+                    blue: 0.098
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: MINN
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.478
+                green: 0.0
+                blue: 0.098
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 0.8
+                    blue: 0.2
+                    alpha: 1.0
+
+NEB:
+    home:
+        userEnteredValue:
+            stringValue: NEB
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 1.0
+                blue: 1.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.816
+                    green: 0.0
+                    blue: 0.0
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: NEB
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.816
+                green: 0.0
+                blue: 0.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 1.0
+                    blue: 1.0
+                    alpha: 1.0
+
+NU:
+    home:
+        userEnteredValue:
+            stringValue: NU
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 1.0
+                blue: 1.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.306
+                    green: 0.165
+                    blue: 0.518
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: NU
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.306
+                green: 0.165
+                blue: 0.518
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 1.0
+                    blue: 1.0
+                    alpha: 1.0
+
+OSU:
+    home:
+        userEnteredValue:
+            stringValue: meteor
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.4
+                green: 0.4
+                blue: 0.4
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.733
+                    green: 0.0
+                    blue: 0.0
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: meteor
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.733
+                green: 0.0
+                blue: 0.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.4
+                    green: 0.4
+                    blue: 0.4
+                    alpha: 1.0
+
+PSU:
+    home:
+        userEnteredValue:
+            stringValue: PSU
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 1.0
+                blue: 1.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.039
+                    green: 0.047
+                    blue: 0.267
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: PSU
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.039
+                green: 0.047
+                blue: 0.267
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 1.0
+                    blue: 1.0
+                    alpha: 1.0
+
+PUR:
+    home:
+        userEnteredValue:
+            stringValue: PUR
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.808
+                green: 0.722
+                blue: 0.533
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.0
+                    green: 0.0
+                    blue: 0.0
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: PUR
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.0
+                green: 0.0
+                blue: 0.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.808
+                    green: 0.722
+                    blue: 0.533
+                    alpha: 1.0
+
+RUT:
+    home:
+        userEnteredValue:
+            stringValue: BUTT
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 1.0
+                blue: 1.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.8
+                    green: 0.0
+                    blue: 0.2
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: BUTT
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.8
+                green: 0.0
+                blue: 0.2
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 1.0
+                    blue: 1.0
+                    alpha: 1.0
+
+WISC:
+    home:
+        userEnteredValue:
+            stringValue: WISC
+        userEnteredFormat:
+            backgroundColor:
+                red: 1.0
+                green: 1.0
+                blue: 1.0
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 0.718
+                    green: 0.004
+                    blue: 0.004
+                    alpha: 1.0
+    road:
+        userEnteredValue:
+            stringValue: WISC
+        userEnteredFormat:
+            backgroundColor:
+                red: 0.718
+                green: 0.004
+                blue: 0.004
+                alpha: 1.0
+            textFormat:
+                foregroundColor:
+                    red: 1.0
+                    green: 1.0
+                    blue: 1.0
+                    alpha: 1.0
