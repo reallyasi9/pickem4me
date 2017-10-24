@@ -109,7 +109,7 @@ def download_slate(service, slate):
     game_columns = result.get('valueRanges')[0]
     game_cells = game_columns.get('values')[0]
 
-    game_regex = re.compile(r'(?:\*\*)?(?:#\d+\s+)?(.*?)\s+(?:vs\.?|@)\s+(?:#\d+\s+)?(.*?)(?:\*\*)?$', re.IGNORECASE)
+    game_regex = re.compile(r'(?:\*\*)?(?:\s*#\s*\d+\s+)?(.*?)\s+(?:vs\.?|@)\s+(?:#\s*\d+\s+)?(.*?)(?:\*\*)?$', re.IGNORECASE)
     games = [c for c in game_cells if c and game_regex.match(c)]
 
     home = []
@@ -248,6 +248,7 @@ def write_picks(service, slate, output, slate_df, format_dict):
         "values": [["Probability of Correct Pick",
                     "Predicted Margin",
                     "Notes",
+                    "Model",
                     "Winner",
                     "Spread",
                     "Correct"]],
@@ -276,7 +277,6 @@ def write_picks(service, slate, output, slate_df, format_dict):
     })
 
     # notes
-    slate_df['notes'] = "(model: " + slate_df['model'] + ")"
     noisy = (abs(slate_df['debiased_line']) >= 14) & (slate_df['noisy_spread'] == 0)
     slate_df.loc[noisy, 'notes'] = "Probably should have been a noisy spread.  " + slate_df.loc[noisy, 'notes']
     far = slate_df['prob'] >= .8
@@ -288,12 +288,19 @@ def write_picks(service, slate, output, slate_df, format_dict):
         "majorDimension": "COLUMNS"
     })
 
+    update_data.append({
+        "range": "'{}'!G2".format(slate_title),
+        "values": [slate_df['model'].tolist()],
+        "majorDimension": "COLUMNS"
+    })
+
     service.spreadsheets().values().batchUpdate(
         spreadsheetId=output,
         body={
             'valueInputOption': "RAW",
             'data': update_data
         }).execute()
+
 
     # For each pick, determine if we should update the style or not
     requests = []
