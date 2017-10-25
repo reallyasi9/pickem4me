@@ -277,6 +277,7 @@ def write_picks(service, slate, output, slate_df, format_dict):
     })
 
     # notes
+    slate_df['notes'] = ""
     noisy = (abs(slate_df['debiased_line']) >= 14) & (slate_df['noisy_spread'] == 0)
     slate_df.loc[noisy, 'notes'] = "Probably should have been a noisy spread.  " + slate_df.loc[noisy, 'notes']
     far = slate_df['prob'] >= .8
