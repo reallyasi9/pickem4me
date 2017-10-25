@@ -37,6 +37,7 @@ teams:
     Indiana: IND
     Indiana State: IN ST
     Iowa: IOWA
+    Iowa St: IA ST
     Kent State: KENT ST
     LA Tech: LA TECH
     Louisville: LOUIS
@@ -53,14 +54,14 @@ teams:
     Nebraska: NEB
     Nevada: NEV
     New Mexico: NEW MX
-    NC St: NC STATE
+    NC St: NC ST
     North Dakota State: ND ST
     North Texas: N TX
     Northwestern: NU
     Notre Dame: ND
     Ohio: OHIO
     Oklahoma: OKLA
-    Oklahoma State: OK ST
+    Oklahoma St: OK ST
     Ole Miss: OLE MISS
     Oregon: ORE
     Oregon State: ORE ST
@@ -95,7 +96,7 @@ teams:
     Wake Forest: WAKE
     Washington: WASH
     Washington St: WASH ST
-    West Va: WVU
+    West Va: W VA
     Wisconsin: WISC
     Wyoming: WYO
 

@@ -244,7 +244,7 @@ def write_picks(service, slate, output, slate_df, format_dict):
     update_data = []
     # titles
     update_data.append({
-        "range": "'{}'!D1:I1".format(slate_title),
+        "range": "'{}'!D1:J1".format(slate_title),
         "values": [["Probability of Correct Pick",
                     "Predicted Margin",
                     "Notes",
