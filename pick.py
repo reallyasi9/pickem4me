@@ -10,6 +10,7 @@ import scipy.stats
 import argparse
 import logging
 import os
+import pprint
 
 from googleapiclient import discovery
 from oauth2client import client, tools
@@ -44,7 +45,7 @@ def get_credentials(flags):
         print('Storing credentials to ' + credential_path)
     return credentials
 
-def main(pred, res, slate, names, formats, model, output, debug, **flags):
+def main(pred, res, slate, names, formats, model, output, debug, dry, **flags):
 
     logging.getLogger().setLevel(debug)
     flags = argparse.Namespace(**flags)
@@ -75,7 +76,7 @@ def main(pred, res, slate, names, formats, model, output, debug, **flags):
     with open(formats) as format_file:
         format_dict = yaml.load(format_file)
 
-    write_picks(service, slate, output, slate_df, format_dict)
+    write_picks(service, slate, output, slate_df, format_dict, dry)
 
 
 
@@ -215,16 +216,26 @@ def predict(slate_df, pred_df, models_df, model, names_dict):
 
 
 ## Write picks
-def write_picks(service, slate, output, slate_df, format_dict):
+def write_picks(service, slate, output, slate_df, format_dict, dry):
+
+    if output is None and not dry:
+        logging.warn("No output spreadsheet ID given: performing dry run")
+        dry = True
 
     slate_sheet = service.spreadsheets().get(spreadsheetId=slate).execute()
     slate_title = slate_sheet.get("properties").get("title")
 
     sheet_id = slate_sheet.get("sheets")[0].get("properties").get("sheetId")
-    output_sheet = service.spreadsheets().sheets().copyTo(
-        spreadsheetId=slate, sheetId=sheet_id,
-        body={"destinationSpreadsheetId": output}).execute()
-    new_sheet_id = output_sheet.get("sheetId")
+    body = {"destinationSpreadsheetId": output}
+    logging.debug("Requesting copyTo:\n%s", pprint.pformat(body))
+    if not dry:
+        output_sheet = service.spreadsheets().sheets().copyTo(
+            spreadsheetId=slate, sheetId=sheet_id,
+            body=body).execute()
+        new_sheet_id = output_sheet.get("sheetId")
+    else:
+        new_sheet_id = None
+
     # Rename the sheet
     rename_sheet_body = {
         'requests': [
@@ -239,7 +250,9 @@ def write_picks(service, slate, output, slate_df, format_dict):
             }
         ]
     }
-    new_sheet = service.spreadsheets().batchUpdate(spreadsheetId=output, body=rename_sheet_body).execute()
+    logging.debug("Requesting:\n%s", pprint.pformat(rename_sheet_body))
+    if not dry:
+        new_sheet = service.spreadsheets().batchUpdate(spreadsheetId=output, body=rename_sheet_body).execute()
 
     update_data = []
     # titles
@@ -295,13 +308,16 @@ def write_picks(service, slate, output, slate_df, format_dict):
         "majorDimension": "COLUMNS"
     })
 
-    service.spreadsheets().values().batchUpdate(
-        spreadsheetId=output,
-        body={
-            'valueInputOption': "RAW",
-            'data': update_data
-        }).execute()
-
+    logging.debug("Requesting batchUpdate of spreadsheetId[%s]:\n%s", output, pprint.pformat({'valueInputOption': "RAW", 'data': update_data}))
+    body = {
+        'valueInputOption': "RAW",
+        'data': update_data
+    }
+    logging.debug("Requesting:\n%s", pprint.pformat(body))
+    if not dry:
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=output,
+            body=body).execute()
 
     # For each pick, determine if we should update the style or not
     requests = []
@@ -322,11 +338,15 @@ def write_picks(service, slate, output, slate_df, format_dict):
             format['rows'] = [{"values": [format_dict[row.pick]['road']]}]
         requests.append({"updateCells": format})
 
-    service.spreadsheets().batchUpdate(
-        spreadsheetId=output,
-        body={"requests": requests,
-              "includeSpreadsheetInResponse": False}
-    ).execute()
+    body = {"requests": requests,
+          "includeSpreadsheetInResponse": False}
+    logging.debug("Requesting:\n%s", pprint.pformat(body))
+
+    if not dry:
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=output,
+            body=body
+        ).execute()
 
 if __name__ == '__main__':
 
@@ -337,8 +357,7 @@ if __name__ == '__main__':
                         required=True)
 
     parser.add_argument('--output', '-o', help="Google Sheets object ID of output sheet",
-                        metavar="SHEET_ID",
-                        required=True)
+                        metavar="SHEET_ID")
 
     parser.add_argument('--pred', '-p', help="URL of NCAA predictions file",
                         metavar="URL",
@@ -360,9 +379,12 @@ if __name__ == '__main__':
                         metavar="MODEL_NAME",
                         default='line')
 
-    parser.add_argument('--debug', '-d', help="Debug level",
+    parser.add_argument('--debug', '-D', help="Debug level",
                         metavar="LEVEL",
                         default='WARNING', choices=logging._levelToName.values())
+
+    parser.add_argument('--dry', '-d', help='Dry run (do not write output to Google Sheets)',
+                        type=bool)
 
     args = parser.parse_args()
 
