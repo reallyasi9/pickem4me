@@ -45,11 +45,10 @@ def get_credentials(flags):
         print('Storing credentials to ' + credential_path)
     return credentials
 
-def main(pred, res, slate, names, formats, model, output, debug, dry, **flags):
+def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
 
-    logging.getLogger().setLevel(debug)
     flags = argparse.Namespace(**flags)
-    flags.logging_level = debug
+    flags.logging_level = level
 
     credentials = get_credentials(flags)
     service = discovery.build('sheets', 'v4', credentials=credentials)
@@ -296,6 +295,8 @@ def write_picks(service, slate, output, slate_df, format_dict, dry):
     far = slate_df['prob'] >= .8
     slate_df.loc[far, 'notes'] = "Not even close.  " + slate_df.loc[far, 'notes']
 
+    logging.info("Making the following picks:\n%s", slate_df[['proper_road', 'proper_home', 'noisy_spread', 'pick', 'prob', 'debiased_line', 'notes', 'model']])
+
     update_data.append({
         "range": "'{}'!F2".format(slate_title),
         "values": [slate_df['notes'].tolist()],
@@ -379,13 +380,15 @@ if __name__ == '__main__':
                         metavar="MODEL_NAME",
                         default='line')
 
-    parser.add_argument('--debug', '-D', help="Debug level",
+    parser.add_argument('--level', '-l', help="Logging level",
                         metavar="LEVEL",
-                        default='WARNING', choices=logging._levelToName.values())
+                        default='INFO', choices=logging._levelToName.values())
 
     parser.add_argument('--dry', '-d', help='Dry run (do not write output to Google Sheets)',
                         type=bool)
 
-    args = parser.parse_args()
+    args = vars(parser.parse_args())
 
-    main(**vars(args))
+    logging.getLogger().setLevel(args['level'])
+
+    main(**args)
