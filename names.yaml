@@ -10,8 +10,10 @@ teams:
     Ball State: BALL ST
     Baylor: BAYLOR
     Bowling Green: BGSU
+    Boise St: BOISE ST
     Buffalo: BUFF
     BYU: BYU
+    Central Florida: UCF
     Charleston Southern: CHAR SO
     Cincinnati: CINCY
     Clemson: CLEM
@@ -20,15 +22,15 @@ teams:
     Duke: DUKE
     E Kentucky: E KY
     ECU: ECU
-    FAU: FAU
     FIU: FIU
     Florida: FLA
-    Fresno State: FRESNO ST
+    Florida Atlantic: FAU
+    Fresno St: FRESNO ST
     FSU: FSU
     Furman: FURMAN
     Ga Southern: GA SO
     Georgia: UGA
-    Georgia State: GA ST
+    Georgia St: GA ST
     GSU: GSU
     Hawaii: HAWAII
     Houston: HOUSTON
@@ -44,6 +46,7 @@ teams:
     Louisville: LOUIS
     LSU: LSU
     Maryland: UMD
+    Memphis: MEMPHIS
     Miami (Fla): MIAMI
     Michigan: MICH
     Michigan St: MSU
@@ -74,19 +77,19 @@ teams:
     Rutgers: RUT
     San Diego State: SDSU
     SMU: SMU
+    South Florida: USF
     Stanford: STAN
     TCU: TCU
     Temple: TEMPLE
     Tennessee: TENN
     Texas A&M: TX A&M
+    Toledo: TOLEDO
     Tulsa: TULSA
     UAB: UAB
-    UCF: UCF
     UCLA: UCLA
     UNC: UNC
     UNLV: UNLV
     USC: USC
-    USF: USF
     Utah: UTAH
     Utah State: UTAH ST
     UTEP: UTEP
