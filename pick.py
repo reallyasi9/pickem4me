@@ -57,20 +57,20 @@ def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
         names_dict = yaml.load(names_file)
 
     slate_df = download_slate(service, slate)
-    logging.debug(slate_df)
+    logging.debug("\n%s", slate_df)
 
     pred_df = download_predictions(pred)
-    logging.debug(pred_df)
+    logging.debug("\n%s", pred_df)
 
     models_df = download_models(res, names_dict)
-    logging.debug(models_df)
+    logging.debug("\n%s", models_df)
 
     slate_df, pred_df = fix_names(slate_df, pred_df, names_dict)
-    logging.debug(pred_df)
-    logging.debug(slate_df)
+    logging.debug("\n%s", pred_df)
+    logging.debug("\n%s", slate_df)
 
     slate_df = predict(slate_df, pred_df, models_df, model, names_dict)
-    logging.debug(slate_df)
+    logging.debug("\n%s", slate_df)
 
     with open(formats) as format_file:
         format_dict = yaml.load(format_file)
@@ -109,16 +109,18 @@ def download_slate(service, slate):
     game_columns = result.get('valueRanges')[0]
     game_cells = game_columns.get('values')[0]
 
-    game_regex = re.compile(r'(?:\*\*)?(?:\s*#\s*\d+\s+)?(.*?)\s+(?:vs\.?|@)\s+(?:#\s*\d+\s+)?(.*?)(?:\*\*)?$', re.IGNORECASE)
+    game_regex = re.compile(r'(?:\*\*)?(?:\s*#\s*\d+\s+)?(.*?)\s+(vs\.?|@)\s+(?:#\s*\d+\s+)?(.*?)(?:\*\*)?$', re.IGNORECASE)
     games = [c for c in game_cells if c and game_regex.match(c)]
 
     home = []
     away = []
+    neutral = []
     for g in games:
-        matches = game_regex.match(g)
+        matches = game_regex.match(g) # already know this works
         if matches:
             away.append(matches.group(1))
-            home.append(matches.group(2))
+            home.append(matches.group(3))
+            neutral.append(matches.group(2) != "@")
 
     gotw = [bool(re.search(r'\*\*', g)) for g in games]
 
@@ -141,6 +143,7 @@ def download_slate(service, slate):
     slate_df = pd.DataFrame(data = {"road": away,
                                     "home": home,
                                     "gotw": gotw,
+                                    "neutral": neutral,
                                     "noisy_favorite": spread_favorites,
                                     "noisy_spread": noisy_spreads})
 
@@ -158,13 +161,29 @@ def fix_names(slate_df, pred_df, names_dict):
         slate_df['proper_' + ha] = slate_df[ha].map(reverse_dict)
         non_match = pd.isnull(slate_df['proper_' + ha])
         if non_match.any():
-            logging.warn("{} slate teams missing from names map: {}".format(ha, slate_df.loc[non_match, ha]))
+            logging.warn("{} slate teams missing from names map:\n{}".format(ha, slate_df.loc[non_match, ha]))
         slate_df.loc[non_match, 'proper_' + ha] = slate_df.loc[non_match, ha]
 
         pred_df[ha] = pred_df[ha].str.upper().str.replace(r'\.', '')
         pred_match = slate_df['proper_' + ha].isin(pred_df[ha])
+
         if (~pred_match).any():
-            logging.warn("{} slate teams missing from predictions: {}".format(ha, slate_df.loc[~pred_match, ha]))
+            logging.warn("{} slate teams missing from predictions:\n{}".format(ha, slate_df.loc[~pred_match, ha]))
+
+    # detect neutral site switcharoo
+    pred_other_match = slate_df['neutral'] & slate_df['proper_home'].isin(pred_df['road']) & slate_df['proper_road'].isin(pred_df['home'])
+
+    if pred_other_match.any():
+        logging.warn("slate teams at neutral sites need to be flipped:\n{}".format(slate_df.loc[pred_other_match, ['home', 'road']]))
+        old_home = slate_df['home'].copy()
+        old_phome = slate_df['proper_home'].copy()
+        slate_df.loc[pred_other_match, 'home'] = slate_df.loc[pred_other_match, 'road']
+        slate_df.loc[pred_other_match, 'proper_home'] = slate_df.loc[pred_other_match, 'proper_road']
+        slate_df.loc[pred_other_match, 'road'] = old_home.loc[pred_other_match]
+        slate_df.loc[pred_other_match, 'proper_road'] = old_phome.loc[pred_other_match]
+
+    logging.debug("Fixed slate:\n%s", slate_df)
+
 
     return slate_df, pred_df
 
@@ -183,6 +202,7 @@ def predict(slate_df, pred_df, models_df, model, names_dict):
 
     slate_df = pd.merge(slate_df, pred_df, how='left',
                         left_on=['proper_home', 'proper_road'], right_on=['home', 'road'])
+    logging.debug("Merged dataset:\n%s", slate_df)
 
     noisy = slate_df['noisy_spread'] != 0
 
@@ -194,6 +214,8 @@ def predict(slate_df, pred_df, models_df, model, names_dict):
 
     slate_df['bias'] = models_df.loc[straight_model, 'Bias']
     slate_df.loc[noisy, 'bias'] = models_df.loc[noisy_model, 'Bias']
+    #slate_df.loc[slate_df['neutral_x'], 'bias'] /= 2 # for close games
+    slate_df.loc[slate_df['neutral_x'], 'bias'] = 0
 
     slate_df['std_dev'] = models_df.loc[straight_model, 'std_dev']
     slate_df.loc[noisy, 'std_dev'] = models_df.loc[noisy_model, 'std_dev']
@@ -385,7 +407,7 @@ if __name__ == '__main__':
                         default='INFO', choices=logging._levelToName.values())
 
     parser.add_argument('--dry', '-d', help='Dry run (do not write output to Google Sheets)',
-                        type=bool)
+                        action="store_true")
 
     args = vars(parser.parse_args())
 
