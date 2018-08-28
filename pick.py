@@ -34,7 +34,7 @@ def get_credentials(flags):
     if not os.path.exists(credential_dir):
         os.makedirs(credential_dir)
     credential_path = os.path.join(credential_dir,
-                                   'sheets.googleapis.com-python-quickstart.json')
+                                   'pickem4me.json')
 
     store = Storage(credential_path)
     credentials = store.get()
