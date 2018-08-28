@@ -20,6 +20,7 @@ SCOPES = 'https://www.googleapis.com/auth/spreadsheets'
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = "B1G Pick 'Em Picker"
 
+
 def get_credentials(flags):
     """Gets valid user credentials from storage.
 
@@ -44,6 +45,7 @@ def get_credentials(flags):
         credentials = tools.run_flow(flow, store, flags)
         print('Storing credentials to ' + credential_path)
     return credentials
+
 
 def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
 
@@ -78,15 +80,14 @@ def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
     write_picks(service, slate, output, slate_df, format_dict, dry)
 
 
-
-## Read in the current line and computer rankings from the Internet.
+# Read in the current line and computer rankings from the Internet.
 def download_predictions(pred):
     with urlopen(pred) as pred_file:
         pred_df = pd.read_csv(pred_file)
     return pred_df
 
 
-## Read the current model perfomance from the Internet.
+# Read the current model perfomance from the Internet.
 def download_models(res, names):
     reverse_dict = {val: key for key, val in names['models'].items()}
     with urlopen(res) as results_file:
@@ -99,7 +100,7 @@ def download_models(res, names):
         return results_df.set_index('System')
 
 
-## Read in the current slate.
+# Read in the current slate.
 def download_slate(service, slate):
 
     range_names = ['A:A', 'B:B']
@@ -116,7 +117,7 @@ def download_slate(service, slate):
     away = []
     neutral = []
     for g in games:
-        matches = game_regex.match(g) # already know this works
+        matches = game_regex.match(g)  # already know this works
         if matches:
             away.append(matches.group(1))
             home.append(matches.group(3))
@@ -152,7 +153,7 @@ def download_slate(service, slate):
     return slate_df
 
 
-## Get proper team names
+# Get proper team names
 def fix_names(slate_df, pred_df, names_dict):
 
     reverse_dict = {val: key.upper() for key, val in names_dict['teams'].items()}
@@ -184,11 +185,10 @@ def fix_names(slate_df, pred_df, names_dict):
 
     logging.debug("Fixed slate:\n%s", slate_df)
 
-
     return slate_df, pred_df
 
 
-## Make picks
+# Make picks
 def predict(slate_df, pred_df, models_df, model, names_dict):
 
     straight_model = model
@@ -214,7 +214,7 @@ def predict(slate_df, pred_df, models_df, model, names_dict):
 
     slate_df['bias'] = models_df.loc[straight_model, 'Bias']
     slate_df.loc[noisy, 'bias'] = models_df.loc[noisy_model, 'Bias']
-    #slate_df.loc[slate_df['neutral_x'], 'bias'] /= 2 # for close games
+    # slate_df.loc[slate_df['neutral_x'], 'bias'] /= 2 # for close games
     slate_df.loc[slate_df['neutral_x'], 'bias'] = 0
 
     slate_df['std_dev'] = models_df.loc[straight_model, 'std_dev']
@@ -225,7 +225,7 @@ def predict(slate_df, pred_df, models_df, model, names_dict):
     slate_df['prob'] = 1 - scipy.stats.norm.cdf(slate_df['noisy_spread'], loc=slate_df['debiased_line'],
                                                 scale=slate_df['std_dev'])
     slate_df['pick'] = slate_df['proper_home']
-    slate_df.loc[pd.isnull(slate_df['prob']), 'pick'] = None # no line available
+    slate_df.loc[pd.isnull(slate_df['prob']), 'pick'] = None  # no line available
     road_picks = slate_df['prob'] < .5
     slate_df.loc[road_picks, 'pick'] = slate_df.loc[road_picks, 'proper_road']
     slate_df.loc[road_picks, 'prob'] = 1 - slate_df.loc[road_picks, 'prob']
@@ -236,7 +236,7 @@ def predict(slate_df, pred_df, models_df, model, names_dict):
     return slate_df
 
 
-## Write picks
+# Write picks
 def write_picks(service, slate, output, slate_df, format_dict, dry):
 
     if output is None and not dry:
@@ -362,7 +362,7 @@ def write_picks(service, slate, output, slate_df, format_dict, dry):
         requests.append({"updateCells": format})
 
     body = {"requests": requests,
-          "includeSpreadsheetInResponse": False}
+            "includeSpreadsheetInResponse": False}
     logging.debug("Requesting:\n%s", pprint.pformat(body))
 
     if not dry:
@@ -370,6 +370,7 @@ def write_picks(service, slate, output, slate_df, format_dict, dry):
             spreadsheetId=output,
             body=body
         ).execute()
+
 
 if __name__ == '__main__':
 
