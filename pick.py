@@ -11,6 +11,7 @@ import argparse
 import logging
 import os
 import pprint
+import datetime
 
 from googleapiclient import discovery
 from oauth2client import client, tools
@@ -47,6 +48,8 @@ def get_credentials(flags):
 
 def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
 
+    now = datetime.datetime.now()
+
     flags = argparse.Namespace(**flags)
     flags.logging_level = level
 
@@ -58,12 +61,18 @@ def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
 
     slate_df = download_slate(service, slate)
     logging.debug("\n%s", slate_df)
+    slate_fn = now.strftime('slate_%Y%m%d-%H%M%S.csv')
+    slate_df.to_csv(slate_fn)
 
     pred_df = download_predictions(pred)
     logging.debug("\n%s", pred_df)
+    pred_fn = now.strftime('predictions_%Y%m%d-%H%M%S.csv')
+    pred_df.to_csv(pred_fn)
 
     models_df = download_models(res, names_dict)
     logging.debug("\n%s", models_df)
+    models_fn = now.strftime('models_%Y%m%d-%H%M%S.csv')
+    models_df.to_csv(models_fn)
 
     slate_df, pred_df = fix_names(slate_df, pred_df, names_dict)
     logging.debug("\n%s", pred_df)
