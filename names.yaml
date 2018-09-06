@@ -7,6 +7,7 @@ teams:
     Arkansas State: ARK ST
     Army: ARMY
     Arizona: ARIZ
+    Arizona St: ASU
     Auburn: AUBURN
     Ball State: BALL ST
     Baylor: BAYLOR
@@ -22,11 +23,12 @@ teams:
     Colorado State: COLO ST
     Duke: DUKE
     E Kentucky: E KY
+    Eastern Mich: E MICH
     ECU: ECU
     Florida Intl: FL INT
     Florida: FLA
     Florida Atlantic: FAU
-    Fresno St: FRESNO ST
+    Fresno St: FRES ST
     Florida St: FSU
     Furman: FURMAN
     Ga Southern: GA SO
@@ -41,7 +43,7 @@ teams:
     Indiana: IND
     Indiana State: IN ST
     Iowa: IOWA
-    Iowa St: IOWA ST
+    Iowa St: ISU
     Kent: KENT ST
     LA Tech: LA TECH
     Louisville: LOUIS
@@ -59,7 +61,7 @@ teams:
     Navy: NAVY
     Nebraska: NEB
     Nevada: NEV
-    New Mexico: NEW MX
+    New Mexico: UNM
     New Mexico St: NM ST
     NC St: NC ST
     North Dakota State: ND ST
@@ -75,11 +77,12 @@ teams:
     Oregon St: OR ST
     Ohio St: OSU
     Penn St: PSU
-    Pitt: PITT
+    Pittsburgh: PITT
     Purdue: PUR
     Rutgers: RUT
     San Diego State: SDSU
     SMU: SMU
+    South Carolina: S CAR
     South Florida: USF
     Stanford: STAN
     TCU: TCU
@@ -99,14 +102,15 @@ teams:
     Utah St: UT ST
     UTEP: UTEP
     UTSA: UTSA
-    UVA: UVA
+    Virginia: UVA
     Virginia Tech: VA TECH
     Western Kentucky: W KY
-    W Michigan: W MICH
+    Western Mich: W MICH
     Wake Forest: WAKE
     Washington: WASH
     Washington St: WASH ST
     West Va: W VA
+    Western Ill: W ILL
     Wisconsin: WISC
     Wyoming: WYO
 
