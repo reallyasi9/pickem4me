@@ -67,7 +67,7 @@ IND:
 IOWA:
     home:
         userEnteredValue:
-            stringValue: 🐔👁️
+            stringValue: IOWA
         userEnteredFormat:
             backgroundColor:
                 red: 1.0
@@ -82,7 +82,7 @@ IOWA:
                     alpha: 1.0
     road:
         userEnteredValue:
-            stringValue: 🐔👁️
+            stringValue: IOWA
         userEnteredFormat:
             backgroundColor:
                 red: 0.0
@@ -99,7 +99,7 @@ IOWA:
 UMD:
     home:
         userEnteredValue:
-            stringValue: 🐢
+            stringValue: UMD
         userEnteredFormat:
             backgroundColor:
                 red: 1.0
@@ -114,7 +114,7 @@ UMD:
                     alpha: 1.0
     road:
         userEnteredValue:
-            stringValue: 🐢
+            stringValue: UMD
         userEnteredFormat:
             backgroundColor:
                 red: 0.878
@@ -235,7 +235,7 @@ MINN:
 NEB:
     home:
         userEnteredValue:
-            stringValue: 🌽
+            stringValue: NEB
         userEnteredFormat:
             backgroundColor:
                 red: 1.0
@@ -250,7 +250,7 @@ NEB:
                     alpha: 1.0
     road:
         userEnteredValue:
-            stringValue: 🌽
+            stringValue: NEB
         userEnteredFormat:
             backgroundColor:
                 red: 0.816
@@ -267,7 +267,7 @@ NEB:
 NU:
     home:
         userEnteredValue:
-            stringValue: 🐱
+            stringValue: NU
         userEnteredFormat:
             backgroundColor:
                 red: 1.0
@@ -282,7 +282,7 @@ NU:
                     alpha: 1.0
     road:
         userEnteredValue:
-            stringValue: 🐱
+            stringValue: NU
         userEnteredFormat:
             backgroundColor:
                 red: 0.306
@@ -331,7 +331,7 @@ OSU:
 PSU:
     home:
         userEnteredValue:
-            stringValue: 🦁
+            stringValue: PSU
         userEnteredFormat:
             backgroundColor:
                 red: 1.0
@@ -346,7 +346,7 @@ PSU:
                     alpha: 1.0
     road:
         userEnteredValue:
-            stringValue: 🦁
+            stringValue: PSU
         userEnteredFormat:
             backgroundColor:
                 red: 0.039
@@ -363,7 +363,7 @@ PSU:
 PUR:
     home:
         userEnteredValue:
-            stringValue: 🚂
+            stringValue: PUR
         userEnteredFormat:
             backgroundColor:
                 red: 0.808
@@ -378,7 +378,7 @@ PUR:
                     alpha: 1.0
     road:
         userEnteredValue:
-            stringValue: 🚂
+            stringValue: PUR
         userEnteredFormat:
             backgroundColor:
                 red: 0.0
@@ -471,11 +471,3 @@ MIAMI:
     road:
         userEnteredValue:
             stringValue: YTM
-
-ND:
-    home:
-        userEnteredValue:
-            stringValue: 🔥
-    road:
-        userEnteredValue:
-            stringValue: 🔥

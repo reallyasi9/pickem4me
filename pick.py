@@ -58,7 +58,7 @@ def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
     credentials = get_credentials(flags)
     service = discovery.build('sheets', 'v4', credentials=credentials)
 
-    with open(names) as names_file:
+    with open(names, encoding="utf-8") as names_file:
         names_dict = yaml.load(names_file)
 
     slate_df = download_slate(service, slate)
@@ -83,7 +83,7 @@ def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
     slate_df = predict(slate_df, pred_df, models_df, model, names_dict)
     logging.debug("\n%s", slate_df)
 
-    with open(formats) as format_file:
+    with open(formats, encoding="utf-8") as format_file:
         format_dict = yaml.load(format_file)
 
     write_picks(service, slate, output, slate_df, format_dict, dry)
