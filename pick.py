@@ -86,7 +86,10 @@ def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
     with open(formats, encoding="utf-8") as format_file:
         format_dict = yaml.load(format_file)
 
-    write_picks(service, slate, output, slate_df, format_dict, dry)
+    picks_df = write_picks(service, slate, output, slate_df, format_dict, dry)
+    picks_fn = now.strftime('picks_%Y%m%d-%H%M%S.csv')
+    picks_df.to_csv(picks_fn)
+
 
 
 # Read in the current line and computer rankings from the Internet.
@@ -379,6 +382,8 @@ def write_picks(service, slate, output, slate_df, format_dict, dry):
             spreadsheetId=output,
             body=body
         ).execute()
+
+    return slate_df[['proper_road', 'proper_home', 'noisy_spread', 'pick', 'prob', 'debiased_line', 'notes', 'model']]
 
 
 if __name__ == '__main__':
