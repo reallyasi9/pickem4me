@@ -9,10 +9,10 @@ teams:
     Arizona: ARIZ
     Arizona St: ASU
     Auburn: AUBURN
-    Ball State: BALL ST
+    Ball St: BALL ST
     Baylor: BAYLOR
     Bowling Green: BGSU
-    Boise St: BOISE ST
+    Boise St: BOISE
     Buffalo: BUFF
     BYU: BYU
     Central Florida: UCF
@@ -44,6 +44,7 @@ teams:
     Indiana State: IN ST
     Iowa: IOWA
     Iowa St: ISU
+    Kansas: KANSAS
     Kent: KENT ST
     LA Tech: LA TECH
     Louisville: LOUIS
@@ -51,6 +52,7 @@ teams:
     Maryland: UMD
     Memphis: MEMPHIS
     Miami (Fla): MIAMI
+    Miami (Ohio): MIAMI (OH)
     Michigan: MICH
     Michigan St: MSU
     Minnesota: MINN
@@ -67,6 +69,7 @@ teams:
     North Dakota State: ND ST
     North Texas: N TX
     Northern Ill: N ILL
+    Northern Iowa: N IA
     Northwestern: NU
     Notre Dame: ND
     Ohio: OHIO
@@ -92,6 +95,7 @@ teams:
     Texas: TEX
     Texas St: TEX ST
     Toledo: TOLEDO
+    Troy St: TROY
     Tulsa: TULSA
     UAB: UAB
     UCLA: UCLA
