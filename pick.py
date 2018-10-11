@@ -114,9 +114,9 @@ def download_models(res, names):
 
 # Print models in a pretty way to debug
 def debug_models(models_df):
-    longest_sys_name = models_df["System"].str.len().max()
-    models_format = "{:<" + longest_sys_name + "s}  {:6.3f}  {:6.3f}  %{:5.2f}{:1s} {:6.3f}{:1s}\n"
-    debug_out =  "{:<" + longest_sys_name + "s}  {:6s}  {:6s}  {:6s}  {:6s} \n".format("System", "MSE", "Bias", "Pct", "StdDev")
+    longest_sys_name = models_df.index.str.len().max()
+    models_format = "{:<" + str(longest_sys_name) + "s}  {:7.3f}  {:+6.3f}  %{:5.2f}{:1s} {:6.3f}{:1s}\n"
+    debug_out =  ("{:<" + str(longest_sys_name) + "s}  {:7s}  {:6s}  {:6s}  {:6s} \n").format("System", "MSE", "Bias", "Pct", "StdDev")
     debug_out += "-------------------------------------------------\n"
     straight_model = models_df.sort_values('Pct. Correct', ascending=False).index[0]
     noisy_model = models_df.sort_values('std_dev', ascending=True).index[0]
@@ -128,7 +128,7 @@ def debug_models(models_df):
         if row.Index == noisy_model:
             std_best = "*"
         debug_out += models_format.format(row.Index, row._6, row.Bias,
-                                          row._2 * 10, pct_best, row.std_dev,
+                                          row._2 * 100, pct_best, row.std_dev,
                                           std_best)
     logging.debug("\n%s", debug_out)
 
@@ -189,7 +189,7 @@ def download_slate(service, slate):
 
 # Print slate in a pretty way to debug
 def debug_slate(slate_df):
-    slate_format = "{:>2d} {:1s} {:^8s} {:1s} {:^8s} {1:1s} {:s}\n"
+    slate_format = "{:>2d} {:1s} {:^8s} {:1s} {:^8s} {:s}\n"
     debug_out =  "Gm    Team 1     Team 2   Noisy Spread\n"
     debug_out += "--------------------------------------\n"
     for row in slate_df.itertuples():
@@ -200,7 +200,7 @@ def debug_slate(slate_df):
         if row.neutral:
             v = "v"
         noise = ""
-        if row.noisy_favorite != "":
+        if row.noisy_favorite:
             noise = "{:s} by {:d}".format(row.noisy_favorite,
                                           abs(row.noisy_spread))
         debug_out += slate_format.format(row.Index, gotw, row.road, v, row.home,
