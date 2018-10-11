@@ -12,6 +12,7 @@ import logging
 import os
 import pprint
 import datetime
+import math
 
 from googleapiclient import discovery
 from oauth2client import client, tools
@@ -62,7 +63,7 @@ def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
         names_dict = yaml.load(names_file)
 
     slate_df = download_slate(service, slate)
-    logging.debug("\n%s", slate_df)
+    debug_slate(slate_df)
     slate_fn = now.strftime('slate_%Y%m%d-%H%M%S.csv')
     slate_df.to_csv(slate_fn)
 
@@ -72,7 +73,7 @@ def main(pred, res, slate, names, formats, model, output, level, dry, **flags):
     pred_df.to_csv(pred_fn)
 
     models_df = download_models(res, names_dict)
-    logging.debug("\n%s", models_df)
+    debug_models(models_df)
     models_fn = now.strftime('models_%Y%m%d-%H%M%S.csv')
     models_df.to_csv(models_fn)
 
@@ -99,7 +100,7 @@ def download_predictions(pred):
     return pred_df
 
 
-# Read the current model perfomance from the Internet.
+# Read the current model performance from the Internet.
 def download_models(res, names):
     reverse_dict = {val: key for key, val in names['models'].items()}
     with urlopen(res) as results_file:
@@ -110,6 +111,27 @@ def download_models(res, names):
         results_df['std_dev'] = np.sqrt(results_df['Mean Square Error'] - results_df['Bias'].pow(2))
         results_df = results_df[pd.notnull(results_df['System'])]
         return results_df.set_index('System')
+
+
+# Print models in a pretty way to debug
+def debug_models(models_df):
+    longest_sys_name = models_df["System"].str.len().max()
+    models_format = "{:<" + longest_sys_name + "s}  {:6.3f}  {:6.3f}  %{:5.2f}{:1s} {:6.3f}{:1s}\n"
+    debug_out =  "{:<" + longest_sys_name + "s}  {:6s}  {:6s}  {:6s}  {:6s} \n".format("System", "MSE", "Bias", "Pct", "StdDev")
+    debug_out += "-------------------------------------------------\n"
+    straight_model = models_df.sort_values('Pct. Correct', ascending=False).index[0]
+    noisy_model = models_df.sort_values('std_dev', ascending=True).index[0]
+    for row in models_df.itertuples():
+        pct_best = " "
+        if row.Index == straight_model:
+            pct_best = "*"
+        std_best = " "
+        if row.Index == noisy_model:
+            std_best = "*"
+        debug_out += models_format.format(row.Index, row._6, row.Bias,
+                                          row._2 * 10, pct_best, row.std_dev,
+                                          std_best)
+    logging.debug("\n%s", debug_out)
 
 
 # Read in the current slate.
@@ -160,9 +182,31 @@ def download_slate(service, slate):
                                     "noisy_favorite": spread_favorites,
                                     "noisy_spread": noisy_spreads})
 
-    slate_df.loc[slate_df['noisy_favorite'] == slate_df['road'], 'noisy_spread'] *= -1
+    slate_df.loc[slate_df['noisy_favorite'] == slate_df['road'],
+                 'noisy_spread'] *= -1
 
     return slate_df
+
+
+# Print slate in a pretty way to debug
+def debug_slate(slate_df):
+    slate_format = "{:>2d} {:1s} {:^8s} {:1s} {:^8s} {1:1s} {:s}\n"
+    debug_out =  "Gm    Team 1     Team 2   Noisy Spread\n"
+    debug_out += "--------------------------------------\n"
+    for row in slate_df.itertuples():
+        gotw = " "
+        if row.gotw:
+            gotw = "*"
+        v = "@"
+        if row.neutral:
+            v = "v"
+        noise = ""
+        if row.noisy_favorite != "":
+            noise = "{:s} by {:d}".format(row.noisy_favorite,
+                                          math.abs(row.noisy_spread))
+        debug_out += slate_format.format(row.Index, gotw, row.road, v, row.home,
+                                         noise)
+    logging.debug("\n%s", debug_out)
 
 
 # Get proper team names
