@@ -12,7 +12,6 @@ import logging
 import os
 import pprint
 import datetime
-import math
 
 from googleapiclient import discovery
 from oauth2client import client, tools
@@ -203,7 +202,7 @@ def debug_slate(slate_df):
         noise = ""
         if row.noisy_favorite != "":
             noise = "{:s} by {:d}".format(row.noisy_favorite,
-                                          math.abs(row.noisy_spread))
+                                          abs(row.noisy_spread))
         debug_out += slate_format.format(row.Index, gotw, row.road, v, row.home,
                                          noise)
     logging.debug("\n%s", debug_out)
