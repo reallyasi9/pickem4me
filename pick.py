@@ -115,21 +115,20 @@ def download_models(res, names):
 # Print models in a pretty way to debug
 def debug_models(models_df):
     longest_sys_name = models_df.index.str.len().max()
-    models_format = "{:<" + str(longest_sys_name) + "s}  {:7.3f}  {:+6.3f}  %{:5.2f}{:1s} {:6.3f}{:1s}\n"
-    debug_out =  ("{:<" + str(longest_sys_name) + "s}  {:7s}  {:6s}  {:6s}  {:6s} \n").format("System", "MSE", "Bias", "Pct", "StdDev")
+    models_format = "{:<" + str(longest_sys_name) + "s}  {:7.3f}{:1s} {:+6.3f}  %{:5.2f}{:1s} {:6.3f}\n"
+    debug_out =  ("{:<" + str(longest_sys_name) + "s}  {:7s}  {:6s}  {:6s}  {:6s}\n").format("System", "MSE", "Bias", "Pct", "StdDev")
     debug_out += "-------------------------------------------------\n"
     straight_model = models_df.sort_values('Pct. Correct', ascending=False).index[0]
-    noisy_model = models_df.sort_values('std_dev', ascending=True).index[0]
+    noisy_model = models_df.sort_values('Mean Square Error', ascending=True).index[0]
     for row in models_df.itertuples():
         pct_best = " "
         if row.Index == straight_model:
             pct_best = "*"
-        std_best = " "
+        mse_best = " "
         if row.Index == noisy_model:
-            std_best = "*"
-        debug_out += models_format.format(row.Index, row._6, row.Bias,
-                                          row._2 * 100, pct_best, row.std_dev,
-                                          std_best)
+            mse_best = "*"
+        debug_out += models_format.format(row.Index, row._6, mse_best, row.Bias,
+                                          row._2 * 100, pct_best, row.std_dev)
     logging.debug("\n%s", debug_out)
 
 
@@ -251,7 +250,7 @@ def predict(slate_df, pred_df, models_df, model, names_dict):
     logging.info("using model {}".format(model))
     if model == 'best':
         straight_model = models_df.sort_values('Pct. Correct', ascending=False).index[0]
-        noisy_model = models_df.sort_values('std_dev', ascending=True).index[0]
+        noisy_model = models_df.sort_values('Mean Square Error', ascending=True).index[0]
         logging.info("best straight pick model: {}".format(straight_model))
         logging.info("best noisy spread model: {}".format(noisy_model))
 
