@@ -127,32 +127,39 @@ teams:
 
 models:
     line: Line (updated)
-    linemidweek: Line (Midweek)
     lineopen: Line (opening)
     linehow: Howell
     linemarsee: Marsee
     linedokter: Doktor Entropy
+    linebihl: Bihl System
     linekeep: Keeper
     lineatom: Atomic Football
     lineargh: ARGH Power Ratings
     linecong: Dave Congrove
     linebillings: Billingsley
     linebillings2: Billingsley+
+    lineharville: David Harville
     linecather: Catherwood Ratings
     lineburdorf: Lee Burdorf
     linepiratings: Pi-Rate Ratings
     linepimean: Pi-Ratings Mean
     linepibias: Pi-Rate Bias
+    #linefremeau: ???
     linerwp: Laffaye RWP
     linemassey: Massey Ratings
     lineclean: Cleanup Hitter
     linebmc: Brent Craig
+    linemidweek: Line (Midweek)
+    linetempo: Tempo Free Gridiron
+    #linefeng: ???
     linepugh: ComPughter Ratings
     linedwig: DP Dwiggins
     linefpi: ESPN FPI
     linecrunch: The Sports Cruncher
     linebressler: Liam Bressler
     linetalis: Talisman Red
+    lineround: Roundtable
+    linerba: Regression Based Analys
     linesag: Sagarin Points
     linesagr: Sagarin Recent
     linesagpred: Sagarin Ratings
@@ -166,16 +173,25 @@ models:
     linelaz: Laz Index
     linepig: Pigskin Index
     linekam: Edward Kambour
+    linel2hf: Least Squares w/ HFA
     linepayne: Payne Power Ratings
+    linepaynep: Payne Predict
+    linepaynewl: Payne W/L
     lineash: Ashby AccuRatings
     linesuper: Super List
+    #linecovers: ???
     linekerns: Stephen Kerns
     lineteamrank: TeamRankings.com
+    linel2: Linear Regression
+    linelog: Logistic Regression
     linecons: Massey Consensus
     linedonchess: Donchess Inference
     lineloud: Loudsound.org
     linecurry: Daniel Curry Index
     linedunk: Dunkel Index
+    #linem2: ???
     lineavg: System Average
     linemedian: System Median
     lineca: Computer Adjusted Line
+    #???: ThePowerRank.com
+    #???: FEI Projections
