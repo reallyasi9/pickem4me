@@ -142,7 +142,7 @@ def download_slate(service, slate):
     game_columns = result.get('valueRanges')[0]
     game_cells = game_columns.get('values')[0]
 
-    game_regex = re.compile(r'(?:\*\*)?(?:\s*#\s*\d+\s+)?(.*?)\s+(vs\.?|@)\s+(?:#\s*\d+\s+)?(.*?)(?:\*\*)?$', re.IGNORECASE)
+    game_regex = re.compile(r'(?:\*\*)?(?:\s*#\s*\d+\s+)?(.*?)\s+(vs\.?|@|at)\s+(?:#\s*\d+\s+)?(.*?)(?:\*\*)?$', re.IGNORECASE)
     games = [c for c in game_cells if c and game_regex.match(c)]
 
     home = []
@@ -172,6 +172,13 @@ def download_slate(service, slate):
         else:
             spread_favorites.append(None)
             noisy_spreads.append(0)
+
+    logging.debug(f"road {away}")
+    logging.debug(f"home {home}")
+    logging.debug(f"gotw {gotw}")
+    logging.debug(f"neutral {neutral}")
+    logging.debug(f"noisy_favorite {spread_favorites}")
+    logging.debug(f"noisy_spread {noisy_spreads}")
 
     slate_df = pd.DataFrame(data = {"road": away,
                                     "home": home,

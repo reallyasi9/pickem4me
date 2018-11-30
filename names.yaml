@@ -15,7 +15,7 @@ teams:
     Bowling Green: BGSU
     Boise St: BOISE
     Boston College: BC
-    Buffalo: BUFF
+    Buffalo: BUFFALO
     BYU: BYU
     California: CAL
     Central Florida: UCF
@@ -32,7 +32,7 @@ teams:
     Florida Intl: FL INT
     Florida: FLA
     Florida Atlantic: FAU
-    Fresno St: FRES ST
+    Fresno St: FRESNO
     Florida St: FSU
     Furman: FURMAN
     Ga Southern: GA SO
@@ -52,12 +52,14 @@ teams:
     Kent: KENT ST
     Kentucky: KENT
     LA Tech: LA TECH
+    Louisiana-Lafayette: LA LAF
     Louisville: LOUIS
     LSU: LSU
     Maryland: UMD
     Memphis: MEMPHIS
     Miami (Fla): MIAMI
     Miami (Ohio): MIAMI (OH)
+    Middle Tenn: MTSU
     Michigan: MICH
     Michigan St: MSU
     Minnesota: MINN
@@ -93,6 +95,7 @@ teams:
     South Carolina: S CAR
     South Florida: USF
     Stanford: STAN
+    Syracuse: SYRA
     TCU: TCU
     Temple: TEMPLE
     Tennessee: TENN
