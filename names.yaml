@@ -8,7 +8,7 @@ teams:
     Army: ARMY
     Arizona: ARIZ
     Arizona St: ASU
-    Auburn: AUBURN
+    Auburn: AUB
     Ball St: BALL ST
     Baylor: BAYLOR
     Bethune-Cookman: BETH
@@ -31,7 +31,7 @@ teams:
     ECU: ECU
     Florida Intl: FL INT
     Florida: FLA
-    Florida Atlantic: FAU
+    Florida Atlantic: FL ATL
     Fresno St: FRESNO
     Florida St: FSU
     Furman: FURMAN
@@ -42,6 +42,7 @@ teams:
     Hawaii: HAWAII
     Houston: HOUSTON
     Howard: HOWARD
+    Idaho: IDAHO
     Illinois: ILL
     Illinois State: ILL ST
     Indiana: IND
@@ -56,9 +57,10 @@ teams:
     Louisville: LOUIS
     LSU: LSU
     Maryland: UMD
+    Massachusetts: UMASS
     Memphis: MEMPHIS
     Miami (Fla): MIAMI
-    Miami (Ohio): MIAMI (OH)
+    Miami (Ohio): MIAMI OH
     Middle Tenn: MTSU
     Michigan: MICH
     Michigan St: MSU
@@ -92,8 +94,10 @@ teams:
     Rutgers: RUT
     San Diego State: SDSU
     SMU: SMU
+    South Dakota State: S DAK ST
     South Carolina: S CAR
     South Florida: USF
+    South Alabama: S ALA
     Stanford: STAN
     Syracuse: SYRA
     TCU: TCU
