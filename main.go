@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"github.com/360EntSecGroup-Skylar/excelize"
+	"cloud.google.com/go/storage"
 	"gonum.org/v1/gonum/stat/distuv"
 )
 
@@ -20,6 +20,9 @@ var projectID = os.Getenv("GCP_PROJECT")
 
 // fsclient is a lazily initialized firestore client
 var fsclient *firestore.Client
+
+// csclient is a Cloud Store client
+var csclient *storage.Client
 
 // PubSubMessage is the payload of a Pub/Sub event.
 type PubSubMessage struct {
@@ -47,7 +50,7 @@ type Slate struct {
 	Week       int                    `firestore:"week"`
 }
 
-// SlateGame represents a game on a slate in Firestore.
+// SlateGame represents a game in Firestore as parsed from a slate.
 type SlateGame struct {
 	GOTW        bool                   `firestore:"gotw"`
 	Home        *firestore.DocumentRef `firestore:"home"`
@@ -61,16 +64,6 @@ type SlateGame struct {
 	Underdog    *firestore.DocumentRef `firestore:"underdog"`
 	Value       int                    `firestore:"value"`
 	Row         int                    `firestore:"row"`
-	// PredictedSpread is the spread as predicted by the selected model.
-	PredictedSpread float64 // not stored in Firestore
-	// Pick is what the model suggests (including possible noisy spread adjustments).
-	Pick *firestore.DocumentRef // not stored in Firestore
-	// PredictedProbability is the probability the pick is correct (including possible noisy spread adjustments).
-	PredictedProbability float64 // not stored in Firestore
-	// Swap signals whether or not Luke's listing of the home/road teams need to be swapped.
-	Swap bool // not stored in Firestore
-	// NeutralDisagreement signals whether or not Luke's designation of a neutral site needs to be changed.
-	NeutralDisagreement bool // not stored in Firestore
 }
 
 // Team is a simple representation of a team in Firestore.
@@ -79,15 +72,14 @@ type Team struct {
 	Name   string `firestore:"team"`
 }
 
-// SlateRow prints the game, the selection, and other columns about the game.
-func (sg *SlateGame) SlateRow(ctx context.Context) ([]string, error) {
-	if sg.Superdog {
-		return sg.superdogRow(ctx)
-	}
-	return sg.gameRow(ctx)
+// SlatePrinter makes a set of strings to print to a slate spreadsheet.
+type SlatePrinter interface {
+	// SlateRow creates a row of strings for direct output to a slate spreadsheet.
+	SlateRow(context.Context) ([]string, error)
 }
 
-func (sg *SlateGame) gameRow(ctx context.Context) ([]string, error) {
+// SlateRow creates a row of strings for direct output to a slate spreadsheet.
+func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	// game, noise, pick, spread, notes, expected value
 	output := make([]string, 6)
 
@@ -120,7 +112,7 @@ func (sg *SlateGame) gameRow(ctx context.Context) ([]string, error) {
 
 	sb.WriteString(roadTeam.School)
 
-	if sg.NeutralSite || sg.NeutralDisagreement {
+	if sg.NeutralSite {
 		sb.WriteString(" vs. ")
 	} else {
 		sb.WriteString(" @ ")
@@ -138,15 +130,100 @@ func (sg *SlateGame) gameRow(ctx context.Context) ([]string, error) {
 
 	output[0] = sb.String()
 
-	if sg.NoisySpread != 0 {
-		favorite := homeTeam
-		ns := sg.NoisySpread
-		if ns < 0 {
-			favorite = roadTeam
-			ns *= -1
-		}
-		output[1] = fmt.Sprintf("%s by ≥ %d", favorite.School, ns)
+	pickedTeam := homeTeam
+	if sg.Pick.ID == sg.Road.ID {
+		pickedTeam = roadTeam
 	}
+
+	if homeTeam.Name == roadTeam.Name {
+		output[2] = pickedTeam.School
+	} else {
+		output[2] = pickedTeam.Name
+	}
+
+	output[3] = fmt.Sprintf("%0.1f", sg.PredictedSpread)
+
+	sb.Reset()
+	if pickedTeam.School == "Michigan" {
+		sb.WriteString("HARBAUGH!!!\n")
+	}
+	if math.Abs(sg.PredictedProbability) > .8 {
+		sb.WriteString("Not even close.\n")
+	}
+	if sg.PredictedSpread >= 14 {
+		sb.WriteString("Probabaly should have been noisy.\n")
+	}
+	if sg.NeutralDisagreement {
+		if sg.NeutralSite {
+			sb.WriteString("NOTE:  This game is at a neutral site.\n")
+		} else {
+			sb.WriteString("NOTE:  This game isn't at a neutral site.\n")
+		}
+	} else if sg.Swap {
+		sb.WriteString("NOTE:  The home and away teams are reversed from their actual values.\n")
+	}
+	output[4] = strings.Trim(sb.String(), "\n")
+
+	value := 1.
+	if sg.GOTW {
+		value = 2.
+	}
+	output[5] = fmt.Sprintf("%0.3f", value*math.Abs(sg.PredictedProbability))
+
+	return output, nil
+}
+
+// SlateRow creates a row of strings for direct output to a slate spreadsheet.
+func (sg NoisySpreadPick) SlateRow(ctx context.Context) ([]string, error) {
+	// game, noise, pick, spread, notes, expected value
+	output := make([]string, 6)
+
+	homeDoc, err := sg.Home.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var homeTeam Team
+	if err := homeDoc.DataTo(&homeTeam); err != nil {
+		return nil, err
+	}
+	roadDoc, err := sg.Road.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var roadTeam Team
+	if err := roadDoc.DataTo(&roadTeam); err != nil {
+		return nil, err
+	}
+
+	var sb strings.Builder
+
+	if sg.Rank1 > 0 {
+		sb.WriteString(fmt.Sprintf("#%d ", sg.Rank1))
+	}
+
+	sb.WriteString(roadTeam.School)
+
+	if sg.NeutralSite {
+		sb.WriteString(" vs. ")
+	} else {
+		sb.WriteString(" @ ")
+	}
+
+	if sg.Rank2 > 0 {
+		sb.WriteString(fmt.Sprintf("#%d ", sg.Rank2))
+	}
+
+	sb.WriteString(homeTeam.School)
+
+	output[0] = sb.String()
+
+	favorite := homeTeam
+	ns := sg.NoisySpread
+	if ns < 0 {
+		favorite = roadTeam
+		ns *= -1
+	}
+	output[1] = fmt.Sprintf("%s by ≥ %d", favorite.School, ns)
 
 	pickedTeam := homeTeam
 	if sg.Pick.ID == sg.Road.ID {
@@ -162,32 +239,33 @@ func (sg *SlateGame) gameRow(ctx context.Context) ([]string, error) {
 	output[3] = fmt.Sprintf("%0.1f", sg.PredictedSpread)
 
 	sb.Reset()
-	if math.Abs(sg.PredictedProbability) > .8 {
-		sb.WriteString("Not even close.  ")
-	}
-	if sg.PredictedSpread >= 14 && sg.NoisySpread == 0 {
-		sb.WriteString("Probabaly should have been noisy.  ")
-	}
 	if pickedTeam.School == "Michigan" {
-		sb.WriteString("HARBAUGH!!!  ")
+		sb.WriteString("HARBAUGH!!!\n")
+	}
+	if math.Abs(sg.PredictedProbability) > .8 {
+		sb.WriteString("Not even close.\n")
+	}
+	if sg.PredictedSpread < 14 {
+		sb.WriteString("This one will be closer than you think.\n")
 	}
 	if sg.NeutralDisagreement {
 		if sg.NeutralSite {
-			sb.WriteString("You should know that this game isn't at a neutral site.  ")
+			sb.WriteString("NOTE:  This game is at a neutral site.\n")
 		} else {
-			sb.WriteString("You should know that this game is at a neutral site.  ")
+			sb.WriteString("NOTE:  This game isn't at a neutral site.\n")
 		}
 	} else if sg.Swap {
-		sb.WriteString("You should know that the home and away teams are swapped.  ")
+		sb.WriteString("NOTE:  The home and away teams are reversed from their actual values.\n")
 	}
-	output[4] = strings.TrimSpace(sb.String())
+	output[4] = strings.Trim(sb.String(), "\n")
 
-	output[5] = fmt.Sprintf("%0.3f", float64(sg.Value)*math.Abs(sg.PredictedProbability))
+	output[5] = fmt.Sprintf("%0.3f", math.Abs(sg.PredictedProbability))
 
 	return output, nil
 }
 
-func (sg *SlateGame) superdogRow(ctx context.Context) ([]string, error) {
+// SlateRow creates a row of strings for direct output to a slate spreadsheet.
+func (sg SuperDogPick) SlateRow(ctx context.Context) ([]string, error) {
 
 	underDoc, err := sg.Underdog.Get(ctx)
 	if err != nil {
@@ -230,6 +308,10 @@ func (sg *SlateGame) superdogRow(ctx context.Context) ([]string, error) {
 
 	output[3] = fmt.Sprintf("%0.1f", sg.PredictedSpread)
 
+	if sg.PredictedProbability > 0.5 {
+		output[4] = "NOTE:  The \"underdog\" is favored to win!"
+	}
+
 	output[5] = fmt.Sprintf("%0.4f", float64(sg.Value)*sg.PredictedProbability)
 
 	return output, nil
@@ -249,12 +331,104 @@ type ModelPrediction struct {
 	Road    *firestore.DocumentRef `firestore:"road"`
 	Neutral bool                   `firestore:"neutral"`
 	Spread  float64                `firestore:"spread"`
+	// Ref is just a reference to the prediction itself
+	Ref *firestore.DocumentRef
 }
 
 // Picker represents a picker in Firestore.
 type Picker struct {
 	Name     string `firestore:"name"`
 	NameLuke string `firestore:"name_luke"`
+}
+
+// Picks represents a collection of pickers' picks for the week.
+type Picks struct {
+	Season    *firestore.DocumentRef `firestore:"season"`
+	Week      int                    `firestore:"week"`
+	Timestamp time.Time              `firestore:"timestamp,serverTimestamp"`
+	Picker    *firestore.DocumentRef `firestore:"picker"`
+}
+
+// StraightUpPick is a pick on a game with no spread.
+type StraightUpPick struct {
+	// Home is the true home team (not what Luke said).
+	Home *firestore.DocumentRef `firestore:"home"`
+	// Road is the true road team (not what Luke said).
+	Road  *firestore.DocumentRef `firestore:"road"`
+	Rank1 int                    `firestore:"rank1"`
+	Rank2 int                    `firestore:"rank2"`
+	GOTW  bool                   `firestore:"gotw"`
+	// NeutralSite is the true neutral site nature of the game (not what Luke said).
+	NeutralSite bool `firestore:"neutral_site"`
+	// NeutralDisagreement is whether or not Luke lied to us about the neutral site of the game.
+	NeutralDisagreement bool `firestore:"neutral_disagreement"`
+	// Swap is whether or not Luke lied to us about who are the home and road teams.
+	Swap bool `firestore:"swap"`
+	// Pick is what the user picked, regardless of the model output.
+	Pick *firestore.DocumentRef `firestore:"pick"`
+	// PredictedSpread is the spread as predicted by the selected model.
+	PredictedSpread float64 `firestore:"predicted_spread"`
+	// PredictedProbability is the probability the pick is correct (including possible noisy spread adjustments).
+	PredictedProbability float64 `firestore:"predicted_probability"`
+	// ModeledGame is a reference to the spread from the model used to make the pick
+	ModeledGame *firestore.DocumentRef `firestore:"modeled_game"`
+	// Row is the row in the slate whence the pick originated.
+	Row int `firestore:"row"`
+}
+
+// NoisySpreadPick is a pick on a noisy spread game.
+type NoisySpreadPick struct {
+	// Home is the true home team (not what Luke said).
+	Home *firestore.DocumentRef `firestore:"home"`
+	// Road is the true road team (not what Luke said).
+	Road        *firestore.DocumentRef `firestore:"road"`
+	Rank1       int                    `firestore:"rank1"`
+	Rank2       int                    `firestore:"rank2"`
+	NoisySpread int                    `firestore:"noisy_spread"`
+	// NeutralSite is the true neutral site nature of the game (not what Luke said).
+	NeutralSite bool `firestore:"neutral_site"`
+	// NeutralDisagreement is whether or not Luke lied to us about the neutral site of the game.
+	NeutralDisagreement bool `firestore:"neutral_disagreement"`
+	// Swap is whether or not Luke lied to us about who are the home and road teams.
+	Swap bool `firestore:"swap"`
+	// Pick is what the user picked, regardless of the model output.
+	Pick *firestore.DocumentRef `firestore:"pick"`
+	// PredictedSpread is the spread as predicted by the selected model.
+	PredictedSpread float64 `firestore:"predicted_spread"`
+	// PredictedProbability is the probability the pick is correct (including possible noisy spread adjustments).
+	PredictedProbability float64 `firestore:"predicted_probability"`
+	// ModeledGame is a reference to the spread from the model used to make the pick
+	ModeledGame *firestore.DocumentRef `firestore:"modeled_game"`
+	// Row is the row in the slate whence the pick originated.
+	Row int `firestore:"row"`
+}
+
+// SuperDogPick is a pick on a superdog spread game.
+type SuperDogPick struct {
+	// Underdog is what Luke called the underdog, regardless of model predictions.
+	Underdog *firestore.DocumentRef `firestore:"underdog"`
+	// Overdog is what Luke called the overdog, regardless of model predictions.
+	Overdog *firestore.DocumentRef `firestore:"overdog"`
+	Rank1   int                    `firestore:"rank1"`
+	Rank2   int                    `firestore:"rank2"`
+	Value   int                    `firestore:"value"`
+	// NeutralSite is the true neutral site nature of the game (not what Luke said).
+	NeutralSite bool `firestore:"neutral_site"`
+	// NeutralDisagreement is whether or not Luke lied to us about the neutral site of the game.
+	NeutralDisagreement bool `firestore:"neutral_disagreement"`
+	// Swap is whether or not Luke lied to us about who are the home and road teams.
+	Swap bool `firestore:"swap"`
+	// Pick is what the user picked, regardless of the model output.
+	// Is nil if this game was not picked.
+	Pick *firestore.DocumentRef `firestore:"pick"`
+	// PredictedSpread is the spread as predicted by the selected model.
+	PredictedSpread float64 `firestore:"predicted_spread"`
+	// PredictedProbability is the probability the pick is correct (including possible noisy spread adjustments).
+	PredictedProbability float64 `firestore:"predicted_probability"`
+	// ModeledGame is a reference to the spread from the model used to make the pick
+	ModeledGame *firestore.DocumentRef `firestore:"modeled_game"`
+	// Row is the row in the slate whence the pick originated.
+	Row int `firestore:"row"`
 }
 
 // PickEm consumes a Pub/Sub message.
@@ -270,6 +444,14 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 		fsclient, err = firestore.NewClient(ctx, projectID)
 		if err != nil {
 			log.Printf("Failed making Firestore client: %v", err)
+			return err
+		}
+	}
+
+	if csclient == nil {
+		csclient, err = storage.NewClient(ctx)
+		if err != nil {
+			log.Printf("Failed making Cloud Storage client: %v", err)
 			return err
 		}
 	}
@@ -344,6 +526,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 			return err
 		}
 		log.Printf("Got prediction '%s': %v", doc.Ref.ID, prediction)
+		prediction.Ref = doc.Ref
 		predictions[i] = prediction
 	}
 
@@ -403,97 +586,155 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	}
 
 	// Pick-a-dog
-	var pickedDog *SlateGame
+	var pickedDog *SuperDogPick
 	var bestValue float64
 
-	// Manipulate in place using the index
-	for i := range games {
-		modelPred, swap, err := lookup(games[i].Home, games[i].Road)
+	// Make picks separate from slate games
+	suPicks := make([]*StraightUpPick, 0)
+	nsPicks := make([]*NoisySpreadPick, 0)
+	sdPicks := make([]*SuperDogPick, 0)
+
+	for _, game := range games {
+		modelPred, swap, err := lookup(game.Home, game.Road)
 		if err != nil {
 			log.Printf("Failed looking up prediction: %v", err)
 			return err
 		}
-		log.Printf("Found prediction for teams %s and %s: %v", games[i].Home.ID, games[i].Road.ID, *modelPred)
+		log.Printf("Found prediction for teams %s and %s: %v", game.Home.ID, game.Road.ID, *modelPred)
 
 		// Remember that positive spread always favors home in the predictions.
 		// It also needs to favor the overdog for calculating probability correctly.
 		spread := modelPred.Spread
-		if games[i].Superdog {
-			if modelPred.Road.ID == games[i].Underdog.ID {
+		if game.Superdog {
+			if modelPred.Road.ID == game.Underdog.ID {
 				spread *= -1
 			}
 		}
 
-		target := games[i].NoisySpread
+		target := game.NoisySpread
 		if swap {
 			target *= -1
 		}
 		prob := modelDist.CDF(spread - float64(target))
 
-		// Update game
-		games[i].Swap = swap
-		games[i].NeutralDisagreement = games[i].NeutralSite != modelPred.Neutral
-		games[i].PredictedSpread = modelPred.Spread
-		games[i].PredictedProbability = prob
+		// Disagreement over neutral site?
+		neutralDisagreement := game.NeutralSite != modelPred.Neutral
 
-		// If it's a dog, wait on the pick
-		if games[i].Superdog {
-			ev := prob * float64(games[i].Value)
+		// Update game
+		if game.Superdog {
+			sdp := SuperDogPick{
+				Underdog:             game.Underdog,
+				Overdog:              game.Overdog,
+				Rank1:                game.Rank1,
+				Rank2:                game.Rank2,
+				Value:                game.Value,
+				NeutralSite:          game.NeutralSite != neutralDisagreement, // logic: 0,0->0, 0,1->1, 1,0->1, 1,1->0
+				NeutralDisagreement:  neutralDisagreement,
+				Swap:                 swap,
+				Pick:                 nil, // hold of on picking superdogs
+				PredictedSpread:      modelPred.Spread,
+				PredictedProbability: prob,
+				ModeledGame:          modelPred.Ref,
+				Row:                  game.Row,
+			}
+			sdPicks = append(sdPicks, &sdp)
+			ev := prob * float64(game.Value)
 			if ev > bestValue {
-				pickedDog = &games[i]
+				pickedDog = &sdp
 				bestValue = ev
 			}
 			continue
 		}
 
-		if prob >= .5 {
-			games[i].Pick = modelPred.Home
-		} else {
-			games[i].Pick = modelPred.Road
+		pick := modelPred.Home
+		if prob < 0.5 {
+			pick = modelPred.Road
 		}
+		if game.NoisySpread > 0 {
+			nsPicks = append(nsPicks, &NoisySpreadPick{
+				Home:                 modelPred.Home,
+				Road:                 modelPred.Road,
+				Rank1:                game.Rank1,
+				Rank2:                game.Rank2,
+				NoisySpread:          game.NoisySpread,
+				NeutralSite:          game.NeutralSite != neutralDisagreement, // logic: 0,0->0, 0,1->1, 1,0->1, 1,1->0
+				NeutralDisagreement:  neutralDisagreement,
+				Swap:                 swap,
+				Pick:                 pick,
+				PredictedSpread:      modelPred.Spread,
+				PredictedProbability: prob,
+				ModeledGame:          modelPred.Ref,
+				Row:                  game.Row,
+			})
+			continue
+		}
+		suPicks = append(suPicks, &StraightUpPick{
+			Home:                 modelPred.Home,
+			Road:                 modelPred.Road,
+			Rank1:                game.Rank1,
+			Rank2:                game.Rank2,
+			GOTW:                 game.GOTW,
+			NeutralSite:          game.NeutralSite != neutralDisagreement, // logic: 0,0->0, 0,1->1, 1,0->1, 1,1->0
+			NeutralDisagreement:  neutralDisagreement,
+			Swap:                 swap,
+			Pick:                 pick,
+			PredictedSpread:      modelPred.Spread,
+			PredictedProbability: prob,
+			ModeledGame:          modelPred.Ref,
+			Row:                  game.Row,
+		})
 	}
 
 	// Pick that dog!
 	pickedDog.Pick = pickedDog.Underdog
 
-	// Make an excel file in memory.
-	outExcel := excelize.NewFile()
-	sheetName := outExcel.GetSheetName(outExcel.GetActiveSheetIndex())
-	// Write the header row
-	outExcel.SetCellStr(sheetName, "A1", "GAME")
-	outExcel.SetCellStr(sheetName, "B1", "Instruction")
-	outExcel.SetCellStr(sheetName, "C1", "Your Selection")
-	outExcel.SetCellStr(sheetName, "D1", "Predicted Spread")
-	outExcel.SetCellStr(sheetName, "E1", "Notes")
-	outExcel.SetCellStr(sheetName, "F1", "Expected Value")
-
-	for _, game := range games {
-		out, err := game.SlateRow(ctx)
-		if err != nil {
-			return fmt.Errorf("Failed making game output: %v", err)
-		}
-		for col, str := range out {
-			colLetter := rune('A' + col)
-			if game.Superdog {
-				if col == 0 {
-					colLetter++
-				} else if col == 1 {
-					continue
-				}
-			}
-			index := fmt.Sprintf("%c%d", colLetter, game.Row)
-			outExcel.SetCellStr(sheetName, index, str)
-		}
-
+	// With picks in place, write to Firestore
+	picksColl := fsclient.Collection("picks")
+	picksRef := picksColl.NewDoc()
+	_, err = picksRef.Create(ctx, &Picks{
+		Season: slate.Season,
+		Week:   slate.Week,
+		Picker: pickerDoc.Ref,
+	})
+	if err != nil {
+		return fmt.Errorf("Failed to write picks to firestore: %v", err)
 	}
 
-	// FIXME!
-	outFile, err := os.Create("output_" + slate.File)
+	suColl := picksRef.Collection("straight_up")
+	nsColl := picksRef.Collection("noisy_spread")
+	sdColl := picksRef.Collection("superdog")
+	fsclient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		for _, pick := range suPicks {
+			ref := suColl.NewDoc()
+			if err := tx.Create(ref, pick); err != nil {
+				return fmt.Errorf("Transaction failed to create StraightUpPick: %v", err)
+			}
+		}
+		for _, pick := range nsPicks {
+			ref := nsColl.NewDoc()
+			if err := tx.Create(ref, pick); err != nil {
+				return fmt.Errorf("Transaction failed to create NoisySpreadPick: %v", err)
+			}
+		}
+		for _, pick := range sdPicks {
+			ref := sdColl.NewDoc()
+			if err := tx.Create(ref, pick); err != nil {
+				return fmt.Errorf("Transaction failed to create SuperDogPick: %v", err)
+			}
+		}
+		return nil
+	})
+	bucket := csclient.Bucket(slate.BucketName)
+	obj := bucket.Object("picks/" + slate.File)
+	w := obj.NewWriter(ctx)
+	defer w.Close()
+
+	outExcel, err := newExcelFile(ctx, suPicks, nsPicks, sdPicks)
 	if err != nil {
 		return err
 	}
-	defer outFile.Close()
-	outExcel.Write(outFile)
+
+	outExcel.Write(w)
 
 	return nil
 }
