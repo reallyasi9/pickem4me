@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
 	"gonum.org/v1/gonum/stat/distuv"
+	"google.golang.org/api/iterator"
 )
 
 // projectID is supplied by the environment, set automatically in GCF
@@ -44,7 +45,7 @@ type Team struct {
 	Name   string `firestore:"team"`
 }
 
-// ModelPerformance prepresents the performacne of a particular model in Firestore.
+// ModelPerformance prepresents the performance of a particular model in Firestore.
 type ModelPerformance struct {
 	Model  *firestore.DocumentRef `firestore:"model"`
 	StdDev float64                `firestore:"std_dev"`
@@ -66,6 +67,13 @@ type ModelPrediction struct {
 type Picker struct {
 	Name     string `firestore:"name"`
 	NameLuke string `firestore:"name_luke"`
+}
+
+// StreakPrediction represents a simplified version of the Beat-the-Streak output in Firestore.
+type StreakPrediction struct {
+	BestPick    []*firestore.DocumentRef `firestore:"best_pick"`
+	Probability float64                  `firestore:"probability"`
+	Spread      float64                  `firestore:"spread"`
 }
 
 // PickEm consumes a Pub/Sub message.
@@ -325,6 +333,12 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	// Pick that dog!
 	pickedDog.Pick = pickedDog.Underdog
 
+	// Finally look up streak
+	streakPick, err := LookupStreakPick(ctx, pickerDoc.Ref, slate.Season, slate.Week)
+	if err != nil {
+		return err
+	}
+
 	// With picks in place, write to Firestore
 	picksColl := fsclient.Collection("picks")
 	picksRef := picksColl.NewDoc()
@@ -340,6 +354,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	suColl := picksRef.Collection("straight_up")
 	nsColl := picksRef.Collection("noisy_spread")
 	sdColl := picksRef.Collection("superdog")
+	streakColl := picksRef.Collection("streak")
 	fsclient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		for _, pick := range suPicks {
 			ref := suColl.NewDoc()
@@ -359,6 +374,12 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 				return fmt.Errorf("Transaction failed to create SuperDogPick: %v", err)
 			}
 		}
+		if streakPick != nil {
+			ref := streakColl.NewDoc()
+			if err := tx.Create(ref, streakPick); err != nil {
+				return fmt.Errorf("Transaction failed to create StreakPick: %v", err)
+			}
+		}
 		return nil
 	})
 	bucket := csclient.Bucket(slate.BucketName)
@@ -366,7 +387,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	w := obj.NewWriter(ctx)
 	defer w.Close()
 
-	outExcel, err := newExcelFile(ctx, suPicks, nsPicks, sdPicks)
+	outExcel, err := newExcelFile(ctx, suPicks, nsPicks, sdPicks, streakPick)
 	if err != nil {
 		return err
 	}
@@ -405,4 +426,24 @@ func GetModel(ctx context.Context, path string) (*firestore.DocumentSnapshot, er
 	}
 
 	return model, nil
+}
+
+// LookupStreakPick looks up the streak pick for a picker in Firestore
+func LookupStreakPick(ctx context.Context, picker, season *firestore.DocumentRef, week int) (*StreakPick, error) {
+	streakPredictionDoc, err := fsclient.Collection("streak_predictions").Where("picker", "==", picker).Where("season", "==", season).Where("week", "==", week).OrderBy("probability", firestore.Desc).Limit(1).Documents(ctx).Next()
+	if err == iterator.Done {
+		// no streak yet, but that's okay!
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("Failed getting streak prediction for picker '%s', season '%s', week %d: %v", picker.ID, season.ID, week, err)
+	}
+	var streakPrediction *StreakPrediction
+	if err := streakPredictionDoc.DataTo(streakPrediction); err != nil {
+		return nil, fmt.Errorf("Failed parsing streak prediction for picker '%s', season '%s', week %d: %v", picker.ID, season.ID, week, err)
+	}
+	streakPick := &StreakPick{Picks: streakPrediction.BestPick,
+		PredictedProbability: streakPrediction.Probability,
+		PredictedSpread:      streakPrediction.Spread}
+	return streakPick, nil
 }

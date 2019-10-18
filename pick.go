@@ -100,6 +100,20 @@ type SuperDogPick struct {
 	Row int `firestore:"row"`
 }
 
+// StreakPick is a pick for the streak.
+type StreakPick struct {
+	// Picks is what the user picked, regardless of the model output.
+	// Note that there could be multiple picks per week.
+	Picks []*firestore.DocumentRef `firestore:"picks"`
+	// PredictedSpread is the spread of the remaining games in the optimal streak as predicted by the selected model.
+	PredictedSpread float64 `firestore:"predicted_spread"`
+	// PredictedProbability is the probability of beating the streak.
+	PredictedProbability float64 `firestore:"predicted_probability"`
+	// Row is not stored for StreakPick...  YET!
+	// FIXME
+	Row int
+}
+
 // SlateRow creates a row of strings for direct output to a slate spreadsheet.
 func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	// game, noise, pick, spread, notes, expected value
@@ -337,4 +351,55 @@ func (sg SuperDogPick) SlateRow(ctx context.Context) ([]string, error) {
 	output[5] = fmt.Sprintf("%0.4f", float64(sg.Value)*sg.PredictedProbability)
 
 	return output, nil
+}
+
+// SlateRow creates a row of strings for direct output to a slate spreadsheet.
+// TODO: still not printing DDs correctly.
+func (sg StreakPick) SlateRow(ctx context.Context) ([]string, error) {
+
+	pickTeamDocs, err := fsclient.GetAll(ctx, sg.Picks)
+	if err != nil {
+		return nil, err
+	}
+
+	pickTeams := make([]*Team, len(pickTeamDocs))
+	for i, doc := range pickTeamDocs {
+		if err := doc.DataTo(pickTeams[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	// nothing, instruction, pick, spread, notes, expected value
+	output := make([]string, 6)
+
+	output[1] = "BEAT THE STREAK!"
+
+	output[2] = strings.Join(uniqueTeamNames(pickTeams), " + ")
+
+	output[3] = fmt.Sprintf("%0.1f", sg.PredictedSpread)
+
+	output[5] = fmt.Sprintf("%0.4f", sg.PredictedProbability)
+
+	return output, nil
+}
+
+func uniqueTeamNames(teams []*Team) []string {
+	uniqueNames := make([]string, len(teams))
+	names := make(map[string]bool)
+	useSchools := false
+	for _, t := range teams {
+		if _, exists := names[t.Name]; exists {
+			useSchools = true
+			break
+		}
+		names[t.Name] = true
+	}
+	for i, t := range teams {
+		if useSchools {
+			uniqueNames[i] = t.School
+		} else {
+			uniqueNames[i] = t.Name
+		}
+	}
+	return uniqueNames
 }

@@ -28,7 +28,7 @@ func addRow(ctx context.Context, outExcel *excelize.File, sheetName string, pick
 	return nil
 }
 
-func newExcelFile(ctx context.Context, suPicks []*StraightUpPick, nsPicks []*NoisySpreadPick, sdPicks []*SuperDogPick) (*excelize.File, error) {
+func newExcelFile(ctx context.Context, suPicks []*StraightUpPick, nsPicks []*NoisySpreadPick, sdPicks []*SuperDogPick, streakPick *StreakPick) (*excelize.File, error) {
 	// Make an excel file in memory.
 	outExcel := excelize.NewFile()
 	sheetName := outExcel.GetSheetName(outExcel.GetActiveSheetIndex())
