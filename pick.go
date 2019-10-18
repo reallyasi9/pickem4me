@@ -109,9 +109,6 @@ type StreakPick struct {
 	PredictedSpread float64 `firestore:"predicted_spread"`
 	// PredictedProbability is the probability of beating the streak.
 	PredictedProbability float64 `firestore:"predicted_probability"`
-	// Row is not stored for StreakPick...  YET!
-	// FIXME
-	Row int
 }
 
 // SlateRow creates a row of strings for direct output to a slate spreadsheet.
