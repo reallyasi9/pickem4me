@@ -136,7 +136,7 @@ func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	var sb strings.Builder
 
 	if sg.GOTW {
-		sb.WriteRune('⭐')
+		sb.WriteString("** ")
 	}
 
 	if sg.Rank1 > 0 {
@@ -158,7 +158,7 @@ func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	sb.WriteString(homeTeam.School)
 
 	if sg.GOTW {
-		sb.WriteRune('⭐')
+		sb.WriteString(" **")
 	}
 
 	output[0] = sb.String()
@@ -177,13 +177,18 @@ func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	output[3] = fmt.Sprintf("%0.1f", sg.PredictedSpread)
 
 	sb.Reset()
+	prob := sg.PredictedProbability
+	// flip for away team winning
+	if prob < 0.5 {
+		prob = 1 - prob
+	}
 	if pickedTeam.School == "Michigan" {
 		sb.WriteString("HARBAUGH!!!\n")
 	}
-	if math.Abs(sg.PredictedProbability) > .8 {
+	if prob > .8 {
 		sb.WriteString("Not even close.\n")
 	}
-	if sg.PredictedSpread >= 14 {
+	if math.Abs(sg.PredictedSpread) >= 14 {
 		sb.WriteString("Probabaly should have been noisy.\n")
 	}
 	if sg.NeutralDisagreement {
@@ -201,7 +206,7 @@ func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	if sg.GOTW {
 		value = 2.
 	}
-	output[5] = fmt.Sprintf("%0.3f", value*math.Abs(sg.PredictedProbability))
+	output[5] = fmt.Sprintf("%0.3f", value*prob)
 
 	return output, nil
 }
@@ -272,13 +277,18 @@ func (sg NoisySpreadPick) SlateRow(ctx context.Context) ([]string, error) {
 	output[3] = fmt.Sprintf("%0.1f", sg.PredictedSpread)
 
 	sb.Reset()
+	prob := sg.PredictedProbability
+	// flip for away team winning
+	if prob < 0.5 {
+		prob = 1 - prob
+	}
 	if pickedTeam.School == "Michigan" {
 		sb.WriteString("HARBAUGH!!!\n")
 	}
-	if math.Abs(sg.PredictedProbability) > .8 {
+	if prob > .8 {
 		sb.WriteString("Not even close.\n")
 	}
-	if sg.PredictedSpread < 14 {
+	if math.Abs(sg.PredictedSpread) < 14 {
 		sb.WriteString("This one will be closer than you think.\n")
 	}
 	if sg.NeutralDisagreement {
@@ -292,7 +302,7 @@ func (sg NoisySpreadPick) SlateRow(ctx context.Context) ([]string, error) {
 	}
 	output[4] = strings.Trim(sb.String(), "\n")
 
-	output[5] = fmt.Sprintf("%0.3f", math.Abs(sg.PredictedProbability))
+	output[5] = fmt.Sprintf("%0.3f", prob)
 
 	return output, nil
 }
@@ -359,11 +369,13 @@ func (sg StreakPick) SlateRow(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 
-	pickTeams := make([]*Team, len(pickTeamDocs))
+	pickTeams := make([]Team, len(pickTeamDocs))
 	for i, doc := range pickTeamDocs {
-		if err := doc.DataTo(pickTeams[i]); err != nil {
+		var t Team
+		if err := doc.DataTo(&t); err != nil {
 			return nil, err
 		}
+		pickTeams[i] = t
 	}
 
 	// nothing, instruction, pick, spread, notes, expected value
@@ -380,7 +392,7 @@ func (sg StreakPick) SlateRow(ctx context.Context) ([]string, error) {
 	return output, nil
 }
 
-func uniqueTeamNames(teams []*Team) []string {
+func uniqueTeamNames(teams []Team) []string {
 	uniqueNames := make([]string, len(teams))
 	names := make(map[string]bool)
 	useSchools := false
