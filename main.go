@@ -407,6 +407,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	obj := bucket.Object("picks/" + slate.File)
 	w := obj.NewWriter(ctx)
 	defer w.Close()
+	w.ObjectAttrs.ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 	outExcel, err := newExcelFile(ctx, suPicks, nsPicks, sdPicks, streakPick)
 	if err != nil {
