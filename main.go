@@ -464,7 +464,8 @@ func GetModels(ctx context.Context, path string) (map[string]*firestore.Document
 
 // LookupStreakPick looks up the streak pick for a picker in Firestore
 func LookupStreakPick(ctx context.Context, picker, season *firestore.DocumentRef, week int) (*StreakPick, error) {
-	streakPredictionDoc, err := fsclient.Collection("streak_predictions").Where("picker", "==", picker).Where("season", "==", season).Where("week", "==", week).OrderBy("probability", firestore.Desc).Limit(1).Documents(ctx).Next()
+	// NOTE: the streak prediction is performed for the previous week.
+	streakPredictionDoc, err := fsclient.Collection("streak_predictions").Where("picker", "==", picker).Where("season", "==", season).Where("week", "==", week-1).Limit(1).Documents(ctx).Next()
 	if err == iterator.Done {
 		// no streak yet, but that's okay!
 		return nil, nil
@@ -472,8 +473,8 @@ func LookupStreakPick(ctx context.Context, picker, season *firestore.DocumentRef
 	if err != nil {
 		return nil, fmt.Errorf("Failed getting streak prediction for picker '%s', season '%s', week %d: %v", picker.ID, season.ID, week, err)
 	}
-	var streakPrediction *StreakPrediction
-	if err := streakPredictionDoc.DataTo(streakPrediction); err != nil {
+	var streakPrediction StreakPrediction
+	if err := streakPredictionDoc.DataTo(&streakPrediction); err != nil {
 		return nil, fmt.Errorf("Failed parsing streak prediction for picker '%s', season '%s', week %d: %v", picker.ID, season.ID, week, err)
 	}
 	streakPick := &StreakPick{Picks: streakPrediction.BestPick,
