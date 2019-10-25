@@ -100,6 +100,17 @@ type SuperDogPick struct {
 	Row int `firestore:"row"`
 }
 
+// StreakPick is a pick for the streak.
+type StreakPick struct {
+	// Picks is what the user picked, regardless of the model output.
+	// Note that there could be multiple picks per week.
+	Picks []*firestore.DocumentRef `firestore:"picks"`
+	// PredictedSpread is the spread of the remaining games in the optimal streak as predicted by the selected model.
+	PredictedSpread float64 `firestore:"predicted_spread"`
+	// PredictedProbability is the probability of beating the streak.
+	PredictedProbability float64 `firestore:"predicted_probability"`
+}
+
 // SlateRow creates a row of strings for direct output to a slate spreadsheet.
 func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	// game, noise, pick, spread, notes, expected value
@@ -125,7 +136,7 @@ func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	var sb strings.Builder
 
 	if sg.GOTW {
-		sb.WriteRune('⭐')
+		sb.WriteString("** ")
 	}
 
 	if sg.Rank1 > 0 {
@@ -147,7 +158,7 @@ func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	sb.WriteString(homeTeam.School)
 
 	if sg.GOTW {
-		sb.WriteRune('⭐')
+		sb.WriteString(" **")
 	}
 
 	output[0] = sb.String()
@@ -166,13 +177,18 @@ func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	output[3] = fmt.Sprintf("%0.1f", sg.PredictedSpread)
 
 	sb.Reset()
+	prob := sg.PredictedProbability
+	// flip for away team winning
+	if prob < 0.5 {
+		prob = 1 - prob
+	}
 	if pickedTeam.School == "Michigan" {
 		sb.WriteString("HARBAUGH!!!\n")
 	}
-	if math.Abs(sg.PredictedProbability) > .8 {
+	if prob > .8 {
 		sb.WriteString("Not even close.\n")
 	}
-	if sg.PredictedSpread >= 14 {
+	if math.Abs(sg.PredictedSpread) >= 14 {
 		sb.WriteString("Probabaly should have been noisy.\n")
 	}
 	if sg.NeutralDisagreement {
@@ -190,7 +206,7 @@ func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 	if sg.GOTW {
 		value = 2.
 	}
-	output[5] = fmt.Sprintf("%0.3f", value*math.Abs(sg.PredictedProbability))
+	output[5] = fmt.Sprintf("%0.3f", value*prob)
 
 	return output, nil
 }
@@ -261,13 +277,18 @@ func (sg NoisySpreadPick) SlateRow(ctx context.Context) ([]string, error) {
 	output[3] = fmt.Sprintf("%0.1f", sg.PredictedSpread)
 
 	sb.Reset()
+	prob := sg.PredictedProbability
+	// flip for away team winning
+	if prob < 0.5 {
+		prob = 1 - prob
+	}
 	if pickedTeam.School == "Michigan" {
 		sb.WriteString("HARBAUGH!!!\n")
 	}
-	if math.Abs(sg.PredictedProbability) > .8 {
+	if prob > .8 {
 		sb.WriteString("Not even close.\n")
 	}
-	if sg.PredictedSpread < 14 {
+	if math.Abs(sg.PredictedSpread) < 14 {
 		sb.WriteString("This one will be closer than you think.\n")
 	}
 	if sg.NeutralDisagreement {
@@ -281,7 +302,7 @@ func (sg NoisySpreadPick) SlateRow(ctx context.Context) ([]string, error) {
 	}
 	output[4] = strings.Trim(sb.String(), "\n")
 
-	output[5] = fmt.Sprintf("%0.3f", math.Abs(sg.PredictedProbability))
+	output[5] = fmt.Sprintf("%0.3f", prob)
 
 	return output, nil
 }
@@ -337,4 +358,57 @@ func (sg SuperDogPick) SlateRow(ctx context.Context) ([]string, error) {
 	output[5] = fmt.Sprintf("%0.4f", float64(sg.Value)*sg.PredictedProbability)
 
 	return output, nil
+}
+
+// SlateRow creates a row of strings for direct output to a slate spreadsheet.
+// TODO: still not printing DDs correctly.
+func (sg StreakPick) SlateRow(ctx context.Context) ([]string, error) {
+
+	pickTeamDocs, err := fsclient.GetAll(ctx, sg.Picks)
+	if err != nil {
+		return nil, err
+	}
+
+	pickTeams := make([]Team, len(pickTeamDocs))
+	for i, doc := range pickTeamDocs {
+		var t Team
+		if err := doc.DataTo(&t); err != nil {
+			return nil, err
+		}
+		pickTeams[i] = t
+	}
+
+	// nothing, instruction, pick, spread, notes, expected value
+	output := make([]string, 6)
+
+	output[1] = "BEAT THE STREAK!"
+
+	output[2] = strings.Join(uniqueTeamNames(pickTeams), " + ")
+
+	output[3] = fmt.Sprintf("%0.1f", sg.PredictedSpread)
+
+	output[5] = fmt.Sprintf("%0.4f", sg.PredictedProbability)
+
+	return output, nil
+}
+
+func uniqueTeamNames(teams []Team) []string {
+	uniqueNames := make([]string, len(teams))
+	names := make(map[string]bool)
+	useSchools := false
+	for _, t := range teams {
+		if _, exists := names[t.Name]; exists {
+			useSchools = true
+			break
+		}
+		names[t.Name] = true
+	}
+	for i, t := range teams {
+		if useSchools {
+			uniqueNames[i] = t.School
+		} else {
+			uniqueNames[i] = t.Name
+		}
+	}
+	return uniqueNames
 }

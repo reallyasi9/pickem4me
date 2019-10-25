@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
 	"gonum.org/v1/gonum/stat/distuv"
+	"google.golang.org/api/iterator"
 )
 
 // projectID is supplied by the environment, set automatically in GCF
@@ -44,7 +45,7 @@ type Team struct {
 	Name   string `firestore:"team"`
 }
 
-// ModelPerformance prepresents the performacne of a particular model in Firestore.
+// ModelPerformance prepresents the performance of a particular model in Firestore.
 type ModelPerformance struct {
 	Model  *firestore.DocumentRef `firestore:"model"`
 	StdDev float64                `firestore:"std_dev"`
@@ -66,6 +67,69 @@ type ModelPrediction struct {
 type Picker struct {
 	Name     string `firestore:"name"`
 	NameLuke string `firestore:"name_luke"`
+}
+
+// StreakPrediction represents a simplified version of the Beat-the-Streak output in Firestore.
+type StreakPrediction struct {
+	BestPick    []*firestore.DocumentRef `firestore:"best_pick"`
+	Probability float64                  `firestore:"probability"`
+	Spread      float64                  `firestore:"spread"`
+}
+
+// Model is a collection of performance metrics, predictions, and a distribution.
+type Model struct {
+	Performance  ModelPerformance
+	Predictions  []ModelPrediction
+	Distribution distuv.Normal
+
+	homeLookup map[string]int
+	roadLookup map[string]int
+}
+
+// Lookup prediction by home and road teams, and whether or not to swap them for the slate.
+func (m *Model) Lookup(home, road *firestore.DocumentRef) (*ModelPrediction, bool, error) {
+	if m.homeLookup == nil || m.roadLookup == nil {
+		// Make a lookup table for home and road teams
+		m.homeLookup = make(map[string]int)
+		m.roadLookup = make(map[string]int)
+		for i, model := range m.Predictions {
+			m.homeLookup[model.Home.ID] = i
+			m.roadLookup[model.Road.ID] = i
+		}
+	}
+	var hr, rr int
+	var ok, maybeSwap bool
+
+	hr, ok = m.homeLookup[home.ID]
+	// if found, everything is fine.
+	// if not, maybe Luke got home and road mixed up?
+	if !ok {
+		hr, maybeSwap = m.roadLookup[home.ID]
+		if !maybeSwap {
+			return nil, false, fmt.Errorf("home team '%s' not in predicted game", home.ID)
+		}
+	}
+
+	// if home is where it should be, road should be found as well
+	if !maybeSwap {
+		rr, ok = m.roadLookup[road.ID]
+		if !ok {
+			return nil, false, fmt.Errorf("road team '%s' not in predicted game", road.ID)
+		}
+	} else {
+		// road should be in home list
+		rr, ok = m.homeLookup[road.ID]
+		if !ok {
+			return nil, false, fmt.Errorf("road->home team '%s' not in predicted game", road.ID)
+		}
+	}
+
+	// now check if the predicted games are the same (i.e., home is actually playing road!)
+	if hr != rr {
+		return nil, false, fmt.Errorf("home '%s' and road '%s' not playing each other", home.ID, road.ID)
+	}
+
+	return &(m.Predictions[hr]), maybeSwap, nil
 }
 
 // PickEm consumes a Pub/Sub message.
@@ -138,88 +202,44 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	log.Printf("Got picker '%s': %v", pickerDoc.Ref.ID, picker)
 
 	// Figure out the model to use
-	modelPerfDoc, err := GetModel(ctx, pem.Model)
+	modelPerfDocs, err := GetModels(ctx, pem.Model)
 	if err != nil {
 		log.Printf("Failed getting model '%s': %v", pem.Model, err)
 		return err
 	}
-	var modelPerf ModelPerformance
-	if err := modelPerfDoc.DataTo(&modelPerf); err != nil {
-		log.Printf("Failed parsing model performance '%s': %v", pem.Model, err)
-		return err
-	}
-	log.Printf("Got model performance for '%s': %v", modelPerfDoc.Ref.ID, modelPerf)
 
-	predictionDocs, err := modelPerfDoc.Ref.Collection("predictions").Documents(ctx).GetAll()
-	if err != nil {
-		log.Printf("Failed getting predictions from model '%s': %v", pem.Model, err)
-		return err
-	}
-	predictions := make([]ModelPrediction, len(predictionDocs))
-	for i, doc := range predictionDocs {
-		var prediction ModelPrediction
-		if err := doc.DataTo(&prediction); err != nil {
-			log.Printf("Failed parsing prediction '%s': %v", doc.Ref.ID, err)
+	models := make(map[string]Model)
+	for gameType, doc := range modelPerfDocs {
+		var modelPerf ModelPerformance
+		if err := doc.DataTo(&modelPerf); err != nil {
+			log.Printf("Failed parsing model performance '%s': %v", pem.Model, err)
 			return err
 		}
-		log.Printf("Got prediction '%s': %v", doc.Ref.ID, prediction)
-		prediction.Ref = doc.Ref
-		predictions[i] = prediction
-	}
+		log.Printf("Got model performance for '%s': %v", doc.Ref.ID, modelPerf)
 
-	// Convert performance model into a probability distribution
-	modelDist := distuv.Normal{
-		Mu:    modelPerf.Bias,
-		Sigma: modelPerf.StdDev,
-	}
-
-	// Start calculating picks and probabilities
-	// Make a lookup table for home and road teams
-	homeLookup := make(map[string]*ModelPrediction)
-	roadLookup := make(map[string]*ModelPrediction)
-	for i := range predictions {
-		model := predictions[i]
-		homeLookup[model.Home.ID] = &predictions[i]
-		roadLookup[model.Road.ID] = &predictions[i]
-	}
-
-	// closure to lookup home and road teams
-	lookup := func(home, road *firestore.DocumentRef) (*ModelPrediction, bool, error) {
-		var hr, rr *ModelPrediction
-		var ok, maybeSwap bool
-
-		hr, ok = homeLookup[home.ID]
-		// if found, everything is fine.
-		// if not, maybe Luke got home and road mixed up?
-		if !ok {
-			hr, maybeSwap = roadLookup[home.ID]
-			if !maybeSwap {
-				return nil, false, fmt.Errorf("home team '%s' not in predicted game", home.ID)
+		predictionDocs, err := doc.Ref.Collection("predictions").Documents(ctx).GetAll()
+		if err != nil {
+			log.Printf("Failed getting predictions from model '%s': %v", pem.Model, err)
+			return err
+		}
+		preds := make([]ModelPrediction, len(predictionDocs))
+		for i, doc := range predictionDocs {
+			var prediction ModelPrediction
+			if err := doc.DataTo(&prediction); err != nil {
+				log.Printf("Failed parsing prediction '%s': %v", doc.Ref.ID, err)
+				return err
 			}
+			log.Printf("Got prediction '%s': %v", doc.Ref.ID, prediction)
+			prediction.Ref = doc.Ref
+			preds[i] = prediction
 		}
 
-		// if home is where it should be, road should be found as well
-		if !maybeSwap {
-			rr, ok = roadLookup[road.ID]
-			if !ok {
-				return nil, false, fmt.Errorf("road team '%s' not in predicted game", road.ID)
-			}
-		} else {
-			// road should be in home list
-			rr, ok = homeLookup[road.ID]
-			if !ok {
-				return nil, false, fmt.Errorf("road->home team '%s' not in predicted game", road.ID)
-			}
+		dist := distuv.Normal{
+			Mu:    modelPerf.Bias,
+			Sigma: modelPerf.StdDev,
 		}
 
-		// now check if the predicted games are the same (i.e., home is actually playing road!)
-		if hr != rr {
-			return nil, false, fmt.Errorf("home '%s' and road '%s' not playing each other", home.ID, road.ID)
-		}
-
-		log.Printf("")
-
-		return hr, maybeSwap, nil
+		models[gameType] = Model{Predictions: preds, Performance: modelPerf, Distribution: dist}
 	}
 
 	// Pick-a-dog
@@ -232,7 +252,16 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	sdPicks := make([]*SuperDogPick, 0)
 
 	for _, game := range games {
-		modelPred, swap, err := lookup(game.Home, game.Road)
+		gameType := "StraightUp"
+		if game.Superdog {
+			gameType = "Superdog"
+		}
+		if game.NoisySpread > 0 {
+			gameType = "NoisySpread"
+		}
+
+		model := models[gameType]
+		modelPred, swap, err := model.Lookup(game.Home, game.Road)
 		if err != nil {
 			log.Printf("Failed looking up prediction: %v", err)
 			return err
@@ -252,7 +281,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 		if swap {
 			target *= -1
 		}
-		prob := modelDist.CDF(spread - float64(target))
+		prob := model.Distribution.CDF(spread - float64(target))
 
 		// Disagreement over neutral site?
 		neutralDisagreement := game.NeutralSite != modelPred.Neutral
@@ -325,6 +354,12 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	// Pick that dog!
 	pickedDog.Pick = pickedDog.Underdog
 
+	// Finally look up streak
+	streakPick, err := LookupStreakPick(ctx, pickerDoc.Ref, slate.Season, slate.Week)
+	if err != nil {
+		return err
+	}
+
 	// With picks in place, write to Firestore
 	picksColl := fsclient.Collection("picks")
 	picksRef := picksColl.NewDoc()
@@ -340,6 +375,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	suColl := picksRef.Collection("straight_up")
 	nsColl := picksRef.Collection("noisy_spread")
 	sdColl := picksRef.Collection("superdog")
+	streakColl := picksRef.Collection("streak")
 	fsclient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		for _, pick := range suPicks {
 			ref := suColl.NewDoc()
@@ -359,14 +395,21 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 				return fmt.Errorf("Transaction failed to create SuperDogPick: %v", err)
 			}
 		}
+		if streakPick != nil {
+			ref := streakColl.NewDoc()
+			if err := tx.Create(ref, streakPick); err != nil {
+				return fmt.Errorf("Transaction failed to create StreakPick: %v", err)
+			}
+		}
 		return nil
 	})
 	bucket := csclient.Bucket(slate.BucketName)
 	obj := bucket.Object("picks/" + slate.File)
 	w := obj.NewWriter(ctx)
 	defer w.Close()
+	w.ObjectAttrs.ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-	outExcel, err := newExcelFile(ctx, suPicks, nsPicks, sdPicks)
+	outExcel, err := newExcelFile(ctx, suPicks, nsPicks, sdPicks, streakPick)
 	if err != nil {
 		return err
 	}
@@ -376,8 +419,8 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	return nil
 }
 
-// GetModel returns the model requested by the given identifier string, or the most conservative model if an empty path is given.
-func GetModel(ctx context.Context, path string) (*firestore.DocumentSnapshot, error) {
+// GetModels returns the model requested by the given identifier string, or the most conservative model if an empty path is given.
+func GetModels(ctx context.Context, path string) (map[string]*firestore.DocumentSnapshot, error) {
 
 	latestTracker, err := fsclient.Collection("prediction_tracker").OrderBy("timestamp", firestore.Desc).Limit(1).Documents(ctx).Next()
 	if err != nil {
@@ -385,24 +428,58 @@ func GetModel(ctx context.Context, path string) (*firestore.DocumentSnapshot, er
 	}
 
 	modelPerfs := latestTracker.Ref.Collection("model_performance")
-
+	models := make(map[string]*firestore.DocumentSnapshot)
 	if path == "" {
-		log.Printf("No model requested: calculating best model at the time of pick")
+		log.Printf("No model requested: calculating best models at the time of pick")
 
-		// Most conservative model (by MAE)
-		bestModel, err := modelPerfs.OrderBy("mae", firestore.Desc).Limit(1).Documents(ctx).Next()
+		// Best SUW for straight-up picks
+		greatModel, err := modelPerfs.OrderBy("suw", firestore.Desc).Limit(1).Documents(ctx).Next()
+		if err != nil {
+			return nil, fmt.Errorf("Failed to get great model: %v", err)
+		}
+		models["StraightUp"] = greatModel
+
+		// Lowest MAE for noisy spreads and superdogs
+		bestModel, err := modelPerfs.OrderBy("mae", firestore.Asc).Limit(1).Documents(ctx).Next()
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get best model: %v", err)
 		}
+		models["NoisySpread"] = bestModel
+		models["Superdog"] = bestModel
 
-		return bestModel, nil
+		return models, nil
 	}
 
+	// Just give me whatever you ask for
 	modelRef := fsclient.Doc(path)
 	model, err := modelPerfs.Where("model", "==", modelRef).Limit(1).Documents(ctx).Next()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get model at path '%s': %v", path, err)
 	}
+	models["StraightUp"] = model
+	models["NoisySpread"] = model
+	models["Superdog"] = model
 
-	return model, nil
+	return models, nil
+}
+
+// LookupStreakPick looks up the streak pick for a picker in Firestore
+func LookupStreakPick(ctx context.Context, picker, season *firestore.DocumentRef, week int) (*StreakPick, error) {
+	// NOTE: the streak prediction is performed for the previous week.
+	streakPredictionDoc, err := fsclient.Collection("streak_predictions").Where("picker", "==", picker).Where("season", "==", season).Where("week", "==", week-1).Limit(1).Documents(ctx).Next()
+	if err == iterator.Done {
+		// no streak yet, but that's okay!
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("Failed getting streak prediction for picker '%s', season '%s', week %d: %v", picker.ID, season.ID, week, err)
+	}
+	var streakPrediction StreakPrediction
+	if err := streakPredictionDoc.DataTo(&streakPrediction); err != nil {
+		return nil, fmt.Errorf("Failed parsing streak prediction for picker '%s', season '%s', week %d: %v", picker.ID, season.ID, week, err)
+	}
+	streakPick := &StreakPick{Picks: streakPrediction.BestPick,
+		PredictedProbability: streakPrediction.Probability,
+		PredictedSpread:      streakPrediction.Spread}
+	return streakPick, nil
 }

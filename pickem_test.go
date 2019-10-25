@@ -10,8 +10,8 @@ func TestPickEm(t *testing.T) {
 	ctx := context.Background()
 	pem := PickEmMessage{
 		Picker: "Phil K",
-		Model:  "models/line",
-		Slate:  "slates/IfO8E8jxew3MtuhnXyNfbeVxof7P2fcve398ct_rT2E",
+		// Model:  "models/line",
+		Slate: "slates/LMcnOpUEn0r9xKfGfw5eK7DKRp7ffEQgDpjROsl5rws",
 	}
 	data, err := json.Marshal(pem)
 	if err != nil {

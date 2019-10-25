@@ -3,6 +3,7 @@ package pickem4me
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"github.com/360EntSecGroup-Skylar/excelize"
 )
@@ -28,7 +29,7 @@ func addRow(ctx context.Context, outExcel *excelize.File, sheetName string, pick
 	return nil
 }
 
-func newExcelFile(ctx context.Context, suPicks []*StraightUpPick, nsPicks []*NoisySpreadPick, sdPicks []*SuperDogPick) (*excelize.File, error) {
+func newExcelFile(ctx context.Context, suPicks []*StraightUpPick, nsPicks []*NoisySpreadPick, sdPicks []*SuperDogPick, streakPick *StreakPick) (*excelize.File, error) {
 	// Make an excel file in memory.
 	outExcel := excelize.NewFile()
 	sheetName := outExcel.GetSheetName(outExcel.GetActiveSheetIndex())
@@ -40,20 +41,40 @@ func newExcelFile(ctx context.Context, suPicks []*StraightUpPick, nsPicks []*Noi
 	outExcel.SetCellStr(sheetName, "E1", "Notes")
 	outExcel.SetCellStr(sheetName, "F1", "Expected Value")
 
+	lastPickRow := -1 // need to calculate where the BTS row is
+	firstSDRow := -1
+
 	for _, game := range suPicks {
+		if game.Row > lastPickRow {
+			lastPickRow = game.Row
+		}
 		if err := addRow(ctx, outExcel, sheetName, game, game.Row); err != nil {
 			return nil, err
 		}
 	}
 
 	for _, game := range nsPicks {
+		if game.Row > lastPickRow {
+			lastPickRow = game.Row
+		}
 		if err := addRow(ctx, outExcel, sheetName, game, game.Row); err != nil {
 			return nil, err
 		}
 	}
 
 	for _, game := range sdPicks {
+		if game.Row < firstSDRow || firstSDRow < 0 {
+			firstSDRow = game.Row
+		}
 		if err := addRow(ctx, outExcel, sheetName, game, game.Row); err != nil {
+			return nil, err
+		}
+	}
+
+	if streakPick != nil {
+		// Between the picks and dogs, closer to the picks.
+		row := int(math.Ceil(float64(lastPickRow) + float64(firstSDRow-lastPickRow)/2.))
+		if err := addRow(ctx, outExcel, sheetName, streakPick, row); err != nil {
 			return nil, err
 		}
 	}
