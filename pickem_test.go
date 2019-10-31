@@ -11,7 +11,7 @@ func TestPickEm(t *testing.T) {
 	pem := PickEmMessage{
 		Picker: "Phil K",
 		// Model:  "models/line",
-		Slate: "slates/LMcnOpUEn0r9xKfGfw5eK7DKRp7ffEQgDpjROsl5rws",
+		Slate: "slates/YUees7QEsYMK8fmLl8wJoGMmAROpUSKqTfqxpNjyNYI",
 	}
 	data, err := json.Marshal(pem)
 	if err != nil {

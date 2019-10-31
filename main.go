@@ -256,7 +256,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 		if game.Superdog {
 			gameType = "Superdog"
 		}
-		if game.NoisySpread > 0 {
+		if game.NoisySpread != 0 {
 			gameType = "NoisySpread"
 		}
 
@@ -316,7 +316,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 		if prob < 0.5 {
 			pick = modelPred.Road
 		}
-		if game.NoisySpread > 0 {
+		if game.NoisySpread != 0 {
 			nsPicks = append(nsPicks, &NoisySpreadPick{
 				Home:                 modelPred.Home,
 				Road:                 modelPred.Road,
