@@ -189,7 +189,7 @@ func (sg StraightUpPick) SlateRow(ctx context.Context) ([]string, error) {
 		sb.WriteString("Not even close.\n")
 	}
 	if math.Abs(sg.PredictedSpread) >= 14 {
-		sb.WriteString("Probabaly should have been noisy.\n")
+		sb.WriteString("Probably should have been noisy.\n")
 	}
 	if sg.NeutralDisagreement {
 		if sg.NeutralSite {

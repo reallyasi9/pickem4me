@@ -351,8 +351,10 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 		})
 	}
 
-	// Pick that dog!
-	pickedDog.Pick = pickedDog.Underdog
+	// Pick that dog!  But only if dogs are still being picked!
+	if pickedDog != nil {
+		pickedDog.Pick = pickedDog.Underdog
+	}
 
 	// Finally look up streak
 	streakPick, err := LookupStreakPick(ctx, pickerDoc.Ref, slate.Season, slate.Week)

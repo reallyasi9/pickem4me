@@ -3,15 +3,16 @@ package pickem4me
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"testing"
 )
 
 func TestPickEm(t *testing.T) {
 	ctx := context.Background()
 	pem := PickEmMessage{
-		Picker: "Phil K",
+		Picker: os.Getenv("picker"),
 		// Model:  "models/line",
-		Slate: "slates/YUees7QEsYMK8fmLl8wJoGMmAROpUSKqTfqxpNjyNYI",
+		Slate: "slates/" + os.Getenv("slate"),
 	}
 	data, err := json.Marshal(pem)
 	if err != nil {
