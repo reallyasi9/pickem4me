@@ -6,17 +6,19 @@ import (
 	"math"
 
 	"github.com/360EntSecGroup-Skylar/excelize"
+
+	bpefs "github.com/reallyasi9/b1gpickem/firestore"
 )
 
-func addRow(ctx context.Context, outExcel *excelize.File, sheetName string, pick SlatePrinter, row int) error {
-	out, err := pick.SlateRow(ctx)
+func addRow(ctx context.Context, outExcel *excelize.File, sheetName string, pick bpefs.SlateRowBuilder, row int) error {
+	out, err := pick.BuildSlateRow(ctx)
 	if err != nil {
-		return fmt.Errorf("Failed making game output: %v", err)
+		return fmt.Errorf("failed making game output: %v", err)
 	}
 	for col, str := range out {
 		colLetter := rune('A' + col)
 		switch pick.(type) {
-		case SuperDogPick:
+		case bpefs.SuperDogPick:
 			if col == 0 {
 				colLetter++
 			} else if col == 1 {
@@ -29,7 +31,7 @@ func addRow(ctx context.Context, outExcel *excelize.File, sheetName string, pick
 	return nil
 }
 
-func newExcelFile(ctx context.Context, suPicks []*StraightUpPick, nsPicks []*NoisySpreadPick, sdPicks []*SuperDogPick, streakPick *StreakPick) (*excelize.File, error) {
+func newExcelFile(ctx context.Context, suPicks []*bpefs.StraightUpPick, nsPicks []*bpefs.NoisySpreadPick, sdPicks []*bpefs.SuperDogPick, streakPick *bpefs.StreakPick) (*excelize.File, error) {
 	// Make an excel file in memory.
 	outExcel := excelize.NewFile()
 	sheetName := outExcel.GetSheetName(outExcel.GetActiveSheetIndex())
