@@ -37,8 +37,14 @@ type PickEmMessage struct {
 	// Picker is the path to a picker in Firestore
 	Picker string `json:"picker"`
 
-	// Model is a path to a model to use when picking (empty value means use the best model possible)
-	Model string `json:"model"`
+	// StraightModel is a path to a model to use when picking striaght-up picks (empty value means use the best model possible)
+	StraightModel string `json:"straightModel"`
+
+	// NoisySpreadModel is a path to a model to use when picking noisy spread picks (empty value means use the best model possible)
+	NoisySpreadModel string `json:"noisySpreadModel"`
+
+	// SuperdogModel is a path to a model to use when picking superdog picks (empty value means use the best model possible)
+	SuperdogModel string `json:"superdogModel"`
 
 	// DryRun tells the code to print what would be written, but not two create the excel output.
 	DryRun bool `json:"dryrun,omitempty"`
@@ -169,10 +175,10 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	}
 	log.Printf("Got picker '%s': %v", pickerDoc.Ref.ID, picker)
 
-	// Figure out the model to use
-	modelPerfDocs, err := GetModels(ctx, pem.Model)
+	// Figure out the models to use
+	modelPerfDocs, err := GetModels(ctx, pem.StraightModel, pem.NoisySpreadModel, pem.SuperdogModel)
 	if err != nil {
-		log.Printf("Failed getting model '%s': %v", pem.Model, err)
+		log.Printf("Failed getting models: %v", err)
 		return err
 	}
 
@@ -180,14 +186,14 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	for gameType, doc := range modelPerfDocs {
 		var modelPerf bpefs.ModelPerformance
 		if err := doc.DataTo(&modelPerf); err != nil {
-			log.Printf("Failed parsing model performance '%s': %v", pem.Model, err)
+			log.Printf("Failed parsing model performance '%v': %v", doc, err)
 			return err
 		}
 		log.Printf("Got model performance for '%s': %v", doc.Ref.ID, modelPerf)
 
 		predictionDocs, err := doc.Ref.Collection("predictions").Documents(ctx).GetAll()
 		if err != nil {
-			log.Printf("Failed getting predictions from model '%s': %v", pem.Model, err)
+			log.Printf("Failed getting predictions from model '%v': %v", doc, err)
 			return err
 		}
 		preds := make([]bpefs.Prediction, len(predictionDocs))
@@ -242,26 +248,37 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 		}
 		log.Printf("Found prediction for teams %s and %s: %v", game.HomeTeam.ID, game.AwayTeam.ID, *modelPred)
 
-		// Remember that positive spread always favors home in the predictions.
-		// It also needs to favor the overdog for calculating probability correctly.
+		// The the model spread is always relative to the _correct_ home team (as understood by the model).
+		// That means the target, which is relative to the home team of the slate, might need ot be swapped as well.
 		spread := modelPred.Spread
-		if game.Superdog {
-			if modelPred.AwayTeam.ID == game.Underdog.ID {
-				spread *= -1
-			}
-		}
-
 		target := game.NoisySpread
 		if swap {
-			target *= -1
+			spread *= -1 // "spread" is now relative to the slate home team.
+			target *= -1 // "target" is now relative to the true home team.
 		}
-		prob := model.Distribution.CDF(spread - float64(target))
+		// This is tricky because prob needs to be relative to the true home team.
+		// The model already calculates the spread based on the true home team.
+		// The target (noisy spread) was just flipped if necessary, so it is also relative to the true home team.
+		prob := model.Distribution.CDF(modelPred.Spread - float64(target))
 
 		// Disagreement over neutral site?
 		neutralDisagreement := game.NeutralSite != modelPred.NeutralSite
 
 		// Update game
+		// Note that the game that is written reflects the slate, not the "truth".
+		// That means home and away teams and spreads might need to be swapped later.
 		if game.Superdog {
+			// The probability is always relative to the true home team.
+			// The "underdog" and "overdog" is parsed from the slate. They are taken to be correct as-is.
+			// The way that superdogs are parsed means the underdog is always considered the away team in the slate.
+			// So from the game's point of view, prob is the probability that the overdog wins.
+			// That means the probability has to be inverted for display purposes (unless the home team actually is the underdog, in which case we are okay).
+			if !swap {
+				prob = 1 - prob
+			} else {
+				// ...but it also means that the spread has to be set back to the original value. Ugh.
+				spread *= -1
+			}
 			sdp := bpefs.SuperDogPick{
 				Underdog:             game.Underdog,
 				Overdog:              game.Overdog,
@@ -272,7 +289,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 				NeutralDisagreement:  neutralDisagreement,
 				HomeAwaySwap:         swap,
 				Pick:                 nil, // hold off on picking superdogs
-				PredictedSpread:      modelPred.Spread,
+				PredictedSpread:      spread,
 				PredictedProbability: prob,
 				ModeledGame:          predRef,
 				Row:                  game.Row,
@@ -301,7 +318,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 				NeutralDisagreement:  neutralDisagreement,
 				HomeAwaySwap:         swap,
 				Pick:                 pick,
-				PredictedSpread:      modelPred.Spread,
+				PredictedSpread:      spread,
 				PredictedProbability: prob,
 				ModeledGame:          predRef,
 				Row:                  game.Row,
@@ -318,7 +335,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 			NeutralDisagreement:  neutralDisagreement,
 			HomeAwaySwap:         swap,
 			Pick:                 pick,
-			PredictedSpread:      modelPred.Spread,
+			PredictedSpread:      spread,
 			PredictedProbability: prob,
 			ModeledGame:          predRef,
 			Row:                  game.Row,
@@ -337,7 +354,20 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	}
 
 	if pem.DryRun {
-		log.Print("DRYRUN: nah.")
+		f, err := os.CreateTemp(".", "dryrun.*.xlsx")
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		log.Printf("DRYRUN: writing Excel output to path %s", f.Name())
+
+		outExcel, err := newExcelFile(ctx, suPicks, nsPicks, sdPicks, streakPick)
+		if err != nil {
+			return err
+		}
+
+		outExcel.Write(f)
 		return nil
 	}
 
@@ -402,7 +432,7 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 }
 
 // GetModels returns the model requested by the given identifier string, or the most conservative model if an empty path is given.
-func GetModels(ctx context.Context, path string) (map[string]*firestore.DocumentSnapshot, error) {
+func GetModels(ctx context.Context, suPath, nsPath, sdPath string) (map[string]*firestore.DocumentSnapshot, error) {
 
 	latestTracker, err := fsclient.Collection("prediction_tracker").OrderBy("timestamp", firestore.Desc).Limit(1).Documents(ctx).Next()
 	if err != nil {
@@ -411,36 +441,49 @@ func GetModels(ctx context.Context, path string) (map[string]*firestore.Document
 
 	modelPerfs := latestTracker.Ref.Collection("model_performance")
 	models := make(map[string]*firestore.DocumentSnapshot)
-	if path == "" {
-		log.Printf("No model requested: calculating best models at the time of pick")
 
-		// Best SUW for straight-up picks
-		greatModel, err := modelPerfs.OrderBy("suw", firestore.Desc).Limit(1).Documents(ctx).Next()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get great model: %v", err)
+	search := func(path, orderBy string, dir firestore.Direction) (*firestore.DocumentSnapshot, error) {
+		if path == "" {
+			log.Printf("No model requested: finding model by %s (%v) at the time of pick", orderBy, dir)
+
+			greatModel, err := modelPerfs.OrderBy(orderBy, dir).Limit(1).Documents(ctx).Next()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get best model: %v", err)
+			}
+			return greatModel, nil
 		}
-		models["StraightUp"] = greatModel
-
-		// Lowest MAE for noisy spreads and superdogs
-		bestModel, err := modelPerfs.OrderBy("mae", firestore.Asc).Limit(1).Documents(ctx).Next()
+		modelRef := fsclient.Doc(path)
+		model, err := modelPerfs.Where("model", "==", modelRef).Limit(1).Documents(ctx).Next()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get best model: %v", err)
+			return nil, fmt.Errorf("failed to get model at path '%s': %v", path, err)
 		}
-		models["NoisySpread"] = bestModel
-		models["Superdog"] = bestModel
-
-		return models, nil
+		return model, nil
 	}
 
-	// Just give me whatever you ask for
-	modelRef := fsclient.Doc(path)
-	model, err := modelPerfs.Where("model", "==", modelRef).Limit(1).Documents(ctx).Next()
+	// Greatest straight-up wins for straight-up picks
+	m, err := search(suPath, "suw", firestore.Desc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get model at path '%s': %v", path, err)
+		return nil, fmt.Errorf("GetModels: failed to get model for straight-up picks: %v", err)
 	}
-	models["StraightUp"] = model
-	models["NoisySpread"] = model
-	models["Superdog"] = model
+	models["StraightUp"] = m
+
+	// Lowest mean absolute error for noisy spread picks
+	m, err = search(nsPath, "mae", firestore.Asc)
+	if err != nil {
+		return nil, fmt.Errorf("GetModels: failed to get model for noisy spread picks: %v", err)
+	}
+	models["NoisySpread"] = m
+
+	// Lowest mean absolute error for superdog picks
+	if sdPath == "" {
+		log.Print("Superdog model not given: using noisy spread model instead")
+		sdPath = nsPath
+	}
+	m, err = search(sdPath, "mae", firestore.Asc)
+	if err != nil {
+		return nil, fmt.Errorf("GetModels: failed to get model for superdog picks: %v", err)
+	}
+	models["Superdog"] = m
 
 	return models, nil
 }

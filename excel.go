@@ -25,7 +25,7 @@ func addRow(ctx context.Context, outExcel *excelize.File, sheetName string, pick
 				continue
 			}
 		}
-		index := fmt.Sprintf("%c%d", colLetter, row)
+		index := fmt.Sprintf("%c%d", colLetter, row+1) // Excel is 1-indexed
 		outExcel.SetCellStr(sheetName, index, str)
 	}
 	return nil
