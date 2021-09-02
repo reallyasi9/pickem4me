@@ -8,7 +8,7 @@ require (
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/googleapis/gax-go/v2 v2.1.0 // indirect
-	github.com/reallyasi9/b1gpickem v0.0.6
+	github.com/reallyasi9/b1gpickem v0.0.7
 	golang.org/x/exp v0.0.0-20210823210606-b36147abdb7c // indirect
 	golang.org/x/net v0.0.0-20210825183410-e898025ed96a // indirect
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f // indirect

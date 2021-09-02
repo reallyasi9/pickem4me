@@ -372,22 +372,21 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 	}
 
 	// With picks in place, write to Firestore
-	picksColl := fsclient.Collection("picks")
-	picksRef := picksColl.NewDoc()
-	_, err = picksRef.Create(ctx, &bpefs.Picks{
-		Season: slate.Season,
-		Week:   slate.Week,
-		Picker: pickerDoc.Ref,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to write picks to firestore: %v", err)
-	}
+	err = fsclient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		picksColl := fsclient.Collection("picks")
+		picksRef := picksColl.NewDoc()
+		if err := tx.Create(picksRef, &bpefs.Picks{
+			Season: slate.Season,
+			Week:   slate.Week,
+			Picker: pickerDoc.Ref,
+		}); err != nil {
+			return fmt.Errorf("transaction failed to create picks: %v", err)
+		}
 
-	suColl := picksRef.Collection("straight_up")
-	nsColl := picksRef.Collection("noisy_spread")
-	sdColl := picksRef.Collection("superdog")
-	streakColl := picksRef.Collection("streak")
-	fsclient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		suColl := picksRef.Collection("straight_up")
+		nsColl := picksRef.Collection("noisy_spread")
+		sdColl := picksRef.Collection("superdog")
+		streakColl := picksRef.Collection("streak")
 		for _, pick := range suPicks {
 			ref := suColl.NewDoc()
 			if err := tx.Create(ref, pick); err != nil {
@@ -414,6 +413,9 @@ func PickEm(ctx context.Context, m PubSubMessage) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	bucket := csclient.Bucket(slate.Bucket)
 	obj := bucket.Object("picks/" + slate.FileName)
