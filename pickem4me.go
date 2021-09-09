@@ -492,8 +492,8 @@ func GetModels(ctx context.Context, suPath, nsPath, sdPath string) (map[string]*
 
 // LookupStreakPick looks up the streak pick for a picker in Firestore
 func LookupStreakPick(ctx context.Context, picker, season *firestore.DocumentRef, week int) (*bpefs.StreakPick, error) {
-	// NOTE: the streak prediction is performed for the previous week.
-	streakPredictionDoc, err := fsclient.Collection("streak_predictions").Where("picker", "==", picker).Where("season", "==", season).Where("week", "==", week-1).Limit(1).Documents(ctx).Next()
+	// NOTE: the streak prediction is performed for _this_ week.
+	streakPredictionDoc, err := fsclient.Collection("streak_predictions").Where("picker", "==", picker).Where("season", "==", season).Where("week", "==", week).Limit(1).Documents(ctx).Next()
 	if err == iterator.Done {
 		// no streak yet, but that's okay!
 		return nil, nil
