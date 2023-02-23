@@ -12,8 +12,8 @@ require (
 	golang.org/x/exp v0.0.0-20210823210606-b36147abdb7c // indirect
 	golang.org/x/net v0.0.0-20210825183410-e898025ed96a // indirect
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f // indirect
-	golang.org/x/sys v0.0.0-20210823070655-63515b42dcdf // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
+	golang.org/x/text v0.3.8 // indirect
 	gonum.org/v1/gonum v0.9.3
 	google.golang.org/api v0.54.0
 	google.golang.org/genproto v0.0.0-20210825212027-de86158e7fda // indirect
